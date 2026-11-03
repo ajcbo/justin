@@ -2,14 +2,21 @@
 
 A deliberately goofy, music-reactive website starring Justin.
 
-Click the face to cycle through eight animations. Both included songs have
-musical-hit maps that drive the squash, bounce, spin, and disco effects.
-Settings can replace the face or music, crop a photo, adjust timing and
-volume, reduce motion, or change animations automatically.
+Click the face to cycle through twelve dances, or drag it to stretch him.
+Choose a click tool to throw tomatoes or eggs, boop him, or paint his face.
+Add hats, sunglasses, a moustache, and deep-fried or pixelated filters.
+Try UFO abduction, inflation, the clone printer, or the random terrible idea.
+Undo crimes resets the toys and music speed.
 
+Both songs have musical-hit maps driving the dance and disco effects.
+Music tries to play on arrival. Browsers that block sound start it on the
+first interaction instead. Music speed also changes pitch where supported.
+Settings can replace the face or music, crop a photo, adjust timing and
+volume, reduce motion, or automatically switch dances every eight hits.
 Photo and music replacements stay in the visitor's tab; they are not uploaded.
 
-## GitHub Pages
+## Website
 
-Publish the main branch from /(root) in Settings > Pages.
-The website's entry point is index.html. No build step is required.
+https://ajcbo.github.io/justin/
+
+GitHub Pages publishes main from /(root). No build step is required.

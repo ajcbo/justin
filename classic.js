@@ -57,20 +57,23 @@ function onBeat(now,strength){pulseTime=now;pulseStrength=Math.max(.3,Math.min(1
 function beatIndex(map,t){let a=0,b=map.length;while(a<b){const m=(a+b)>>1;if(map[m][0]<=t)a=m+1;else b=m}return a-1}
 function head(x,y,size,rotation=0,sx=1,sy=1,alpha=1,warp=0){if(!faceReady)return;ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.rotate(rotation);ctx.scale(sx,sy);const ht=size*1280/820,source=mischief.image();ctx.imageSmoothingEnabled=source===cut;ctx.filter=mischief.filter();
  if(warp){const strips=40,sourceHeight=source.height/strips;for(let i=0;i<strips;i++){const z=i/strips,spread=mode===6?1+warp*Math.exp(-Math.pow((z-.25)*4,2)):1+Math.sin(z*18-warp*2)*warp*.35;const shift=mode===4?Math.sin(z*15+warp*4)*size*warp*.1:0;ctx.drawImage(source,0,i*sourceHeight,source.width,sourceHeight,shift-size*spread/2,-ht/2+i*ht/strips,size*spread,ht/strips+1)}}else ctx.drawImage(source,-size/2,-ht/2,size,ht);mischief.dress(size);ctx.restore()}
-function disco(now,impact,t){if(!$('disco').checked||audio.paused||$('gentle').checked)return;
+function disco(now,impact,t){if(!$('disco').checked||$('gentle').checked)return;
  ctx.save();const hue=(beatCount*53)%360;ctx.globalAlpha=.055+impact*.055;for(let i=0;i<6;i++){const a=now*.12+i*Math.PI/3;ctx.fillStyle=colors[i%5];ctx.beginPath();ctx.moveTo(w/2,-10);ctx.lineTo(w/2+Math.cos(a)*w*1.4,h+30);ctx.lineTo(w/2+Math.cos(a+.22)*w*1.4,h+30);ctx.fill()}ctx.globalAlpha=.11;
  const tile=Math.min(w/15,52),floorY=h*.84;for(let row=0;row<3;row++)for(let col=-6;col<7;col++){ctx.fillStyle=colors[(col+row+beatCount+100)%5];ctx.fillRect(w/2+col*tile*(1+row*.25),floorY+row*12,tile*(1+row*.25)-2,10)}
  ctx.globalAlpha=.5;for(let i=0;i<16;i++){ctx.fillStyle=colors[(i+beatCount)%5];const px=(i*139+Math.sin(t+i)*80+w*2)%w,py=(i*79+Math.cos(t*.7+i)*50+h*2)%h;ctx.fillRect(px,py,4+impact*6,4+impact*6)}
  ctx.globalAlpha=1;ctx.strokeStyle='#aaa';ctx.beginPath();ctx.moveTo(w/2,0);ctx.lineTo(w/2,23);ctx.stroke();ctx.save();ctx.translate(w/2,40);ctx.rotate(Math.sin(t)*.2);ctx.beginPath();ctx.arc(0,0,19,0,Math.PI*2);ctx.clip();for(let y=-20;y<20;y+=7)for(let x=-20;x<20;x+=7){ctx.fillStyle=(Math.floor((x+20)/7)+Math.floor((y+20)/7)+beatCount)%3===0?'#fff':'#aaa';ctx.fillRect(x,y,6,6)}ctx.restore();ctx.restore()}
-function frame(ms){requestAnimationFrame(frame);const now=ms/1000,dt=Math.min(now-lastFrame,.05);lastFrame=now;const active=!audio.paused,t=audio.currentTime,offset=Number($('offset').value)/1000;ctx.clearRect(0,0,w,h);
- if(active){const map=tracks[track].beats;if(map.length){const index=beatIndex(map,t-offset);if(index!==lastIndex){if(index>=0&&Math.abs(t-lastTime)<.3&&t-offset-map[index][0]<.12)onBeat(now,map[index][1]);lastIndex=index}}else if(analyser){analyser.getByteFrequencyData(spectrum);let bass=0;for(let i=1;i<10;i++)bass+=spectrum[i]/(9*255);bassAverage+=(bass-bassAverage)*.03;if(bass>bassAverage*1.18&&bass-lastBass>.045&&t-lastLive>.23){onBeat(now,1);lastLive=t}lastBass=bass}}lastTime=t;
+// Choreography always has a clock. Music provides beats when it is playing;
+// otherwise a quiet 100 BPM pulse keeps every dance and the auto-cycle moving.
+let motionTime=0,lastSilentBeat=-1;
+function frame(ms){requestAnimationFrame(frame);const now=ms/1000,dt=Math.min(now-lastFrame,.05);lastFrame=now;motionTime+=dt;const active=!audio.paused&&!audio.ended&&audio.readyState>=2,t=motionTime,audioTime=audio.currentTime,offset=Number($('offset').value)/1000;ctx.clearRect(0,0,w,h);
+ if(active){lastSilentBeat=-1;const map=tracks[track].beats;if(map.length){const index=beatIndex(map,audioTime-offset);if(index!==lastIndex){if(index>=0&&Math.abs(audioTime-lastTime)<.3&&audioTime-offset-map[index][0]<.12)onBeat(now,map[index][1]);lastIndex=index}}else if(analyser){analyser.getByteFrequencyData(spectrum);let bass=0;for(let i=1;i<10;i++)bass+=spectrum[i]/(9*255);bassAverage+=(bass-bassAverage)*.03;if(bass>bassAverage*1.18&&bass-lastBass>.045&&audioTime-lastLive>.23){onBeat(now,1);lastLive=audioTime}lastBass=bass}}else{const index=Math.floor(motionTime/.6);if(index!==lastSilentBeat){lastSilentBeat=index;onBeat(now,.65)}}lastTime=audioTime;
  const gentle=$('gentle').checked,power=Number($('intensity').value)/100*(gentle?.14:1),age=now-pulseTime,p=(1-Math.exp(-Math.max(0,age)*75))*Math.exp(-Math.max(0,age)*7)*Math.cos(Math.max(0,age)*16),impact=(1-Math.exp(-Math.max(0,age)*65))*Math.exp(-Math.max(0,age)*6),kick=p*power*pulseStrength,ageBounce=Math.max(0,1-age/.42),bounce=Math.sin(ageBounce*Math.PI),size=Math.min(w*.39,h*.51,285),baseY=h*.52;
  disco(now,impact,t);mischief.behind(now,w,h);ctx.save();ctx.fillStyle='#000';ctx.globalAlpha=.08;ctx.beginPath();ctx.ellipse(w/2,h*.9,size*.4*(1-kick*.2),7,0,0,Math.PI*2);ctx.fill();ctx.restore();
  let x=w/2,y=baseY,rot=0,sx=1,sy=1,warp=0;
  if(mode===0){sx=1+kick*.65;sy=1-kick*.42;rot=kick*.24*(beatCount%2?1:-1);y+=kick*25}
  if(mode===1){y-=bounce*100*power;sy=1-kick*.3;sx=1+kick*.35;rot=kick*.15}
  if(mode===2){spin+=(spinTarget-spin)*Math.min(1,dt*12);rot=spin*(gentle?.05:1);sx=1+kick*.2;sy=1-kick*.2}
- if(mode===3){for(let i=0;i<8;i++){const angle=i*Math.PI/4+(active?t*.25:0),radius=1+kick*.18;head(w/2+Math.cos(angle)*Math.min(w*.34,240)*radius,baseY+Math.sin(angle)*h*.29*radius,size*.34,Math.sin(angle+beatCount)*kick*.5,1+kick*.3,1-kick*.2)}sx=1+kick*.4;sy=1-kick*.3}
+ if(mode===3){for(let i=0;i<8;i++){const angle=i*Math.PI/4+t*.25,radius=1+kick*.18;head(w/2+Math.cos(angle)*Math.min(w*.34,240)*radius,baseY+Math.sin(angle)*h*.29*radius,size*.34,Math.sin(angle+beatCount)*kick*.5,1+kick*.3,1-kick*.2)}sx=1+kick*.4;sy=1-kick*.3}
  if(mode===4){warp=kick*1.5;sx=1+kick*.2;sy=1-kick*.25}
  if(mode===5){const triangle=v=>Math.abs((v%2+2)%2-1);x=size*.6+triangle(t*.22)*(w-size*1.2);y=size*.8+triangle(t*.31+.7)*Math.max(0,h-size*1.7);rot=kick*.3;sx=1+kick*.3;sy=1-kick*.2}
  if(mode===6){warp=impact*power*1.2;sy=1+kick*.15}
@@ -87,7 +90,7 @@ function frame(ms){requestAnimationFrame(frame);const now=ms/1000,dt=Math.min(no
  for(const part of particles){part.life-=dt;part.x+=part.vx*dt;part.y+=part.vy*dt;part.vy+=400*dt;ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,part.life*2));ctx.fillStyle=part.color;if(part.symbol){ctx.font='20px serif';ctx.fillText(part.symbol,part.x,part.y)}else ctx.fillRect(part.x,part.y,6,6);ctx.restore()}particles=particles.filter(q=>q.life>0);
  mischief.front(now,dt,w,h,head);
  const blend=1-(now-modeBlendAt)/.28;if(blend>0&&previousFrame.width&&!gentle){ctx.save();ctx.globalAlpha=blend*blend;ctx.drawImage(previousFrame,0,0,w,h);ctx.restore()}
- $('beat-light').style.color=active&&age<.1?'#ff00bb':'#ddd';$('caption').style.opacity=active&&beatCount%4===0&&!gentle?Math.max(0,1-age*3):0;
+ $('beat-light').style.color=age<.1?'#ff00bb':'#ddd';$('caption').style.opacity=beatCount%4===0&&!gentle?Math.max(0,1-age*3):0;
 }
 const mischief=createMischief({audio,canvas,ctx,cut,toast,burst,nextMode,setMode,getAudioContext:()=>ac});
 for(let i=8;i<modeNames.length;i++)$('animation').add(new Option(modeNames[i],String(i)));

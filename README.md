@@ -5,6 +5,7 @@ A deliberately goofy clicker game starring Justin Tangarorang.
 [Play Justin Clicker](https://ajcbo.github.io/justin/)
 
 - Click or tap Justin to earn points and change his dance. Space also clicks; arrow keys change dances.
+- Justin keeps dancing and cycling animations without music. Background music supplies its own beat timing when playing; otherwise a silent rhythm drives the animation.
 - Unlock seven face versions. Face bonuses stack permanently; wear any unlocked face and keep every bonus.
 - Buy stronger clicking fingers and passive generators in Bad investments.
 - Click less than 0.65 seconds apart to build a combo. The voice gets higher with every hit, up to two octaves higher, while rings, glow and callouts escalate.

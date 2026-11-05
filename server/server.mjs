@@ -6,6 +6,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import {isIP} from 'node:net';
 const require=createRequire(import.meta.url),G=require('../dist/clicker-core.js'),derive=promisify(scrypt);
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const dbPath=process.env.JUSTIN_DB||path.join(path.dirname(fileURLToPath(import.meta.url)),'data/game.sqlite');
@@ -25,6 +26,9 @@ const secure=publicOrigin.startsWith('https://'),cookieName='justin_session',has
 const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data))};
 const fail=(status,message)=>Object.assign(Error(message),{status});
 const buckets=new Map();
+// Railway's public HTTP edge replaces X-Real-IP with the client's address.
+// Do not add a TCP proxy or untrusted services to this single-service deployment.
+function clientAddress(req){const ip=req.headers['x-real-ip'];return process.env.RAILWAY_ENVIRONMENT_ID&&typeof ip==='string'&&isIP(ip)?ip:req.socket.remoteAddress}
 function limit(key,max,windowMs){const now=Date.now(),entry=buckets.get(key);if(!entry||entry.until<now){buckets.set(key,{until:now+windowMs,count:1});return}if(++entry.count>max)throw fail(429,'Too many attempts. Please wait a few minutes.');}
 setInterval(()=>{const now=Date.now();for(const [key,value]of buckets)if(value.until<now)buckets.delete(key);db.prepare('DELETE FROM sessions WHERE expires < ?').run(now);db.prepare('DELETE FROM receipts WHERE created_at < ?').run(now-86400000)},60000).unref();
 async function body(req){if(!req.headers['content-type']?.startsWith('application/json'))throw fail(415,'Send JSON.');let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>40000)throw fail(413,'Request is too large.');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString())}catch{throw fail(400,'Invalid request.')}}
@@ -35,12 +39,12 @@ function player(userId){return db.prepare('SELECT * FROM players WHERE user_id=?
 function publicPlayer(userId){const row=player(userId);return {state:G.clean(JSON.parse(row.state)),bestCombo:row.best_combo}}
 function requireSession(req){const s=session(req);if(!s)throw fail(401,'Please log in again.');if(req.headers['x-csrf-token']!==s.csrf)throw fail(403,'Session check failed. Refresh and try again.');return s}
 function originCheck(req){if(req.headers.origin!==publicOrigin)throw fail(403,'This request must come from the game website.');}
-async function auth(req,res,mode){originCheck(req);limit('auth:'+req.socket.remoteAddress,20,600000);const data=await body(req),username=typeof data.username==='string'?data.username.trim():'',password=typeof data.password==='string'?data.password:'';
+async function auth(req,res,mode){originCheck(req);limit('auth:'+clientAddress(req),20,600000);const data=await body(req),username=typeof data.username==='string'?data.username.trim():'',password=typeof data.password==='string'?data.password:'';
  if(!/^[A-Za-z0-9_]{3,20}$/.test(username))throw fail(400,'Use 3–20 letters, numbers, or underscores for your username.');
  if(password.length<10||password.length>128)throw fail(400,'Use a password between 10 and 128 characters.');
  const usernameKey=username.toLowerCase();let user=db.prepare('SELECT * FROM users WHERE username_key=?').get(usernameKey);
  if(mode==='register'){
-  limit('register:'+req.socket.remoteAddress,5,3600000);if(user)throw fail(409,'That username is taken. Try another.');const id=randomBytes(16).toString('hex'),salt=randomBytes(16).toString('hex'),passwordHash=(await derive(password,salt,64,{N:32768,r:8,p:1,maxmem:67108864})).toString('hex'),now=Date.now();
+  limit('register:'+clientAddress(req),5,3600000);if(user)throw fail(409,'That username is taken. Try another.');const id=randomBytes(16).toString('hex'),salt=randomBytes(16).toString('hex'),passwordHash=(await derive(password,salt,64,{N:32768,r:8,p:1,maxmem:67108864})).toString('hex'),now=Date.now();
   db.exec('BEGIN IMMEDIATE');try{db.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run(id,username,usernameKey,salt,passwordHash,now);db.prepare('INSERT INTO players(user_id,state,updated_at,budget_at) VALUES(?,?,?,?)').run(id,JSON.stringify(G.fresh()),now,now);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');if(String(error).includes('UNIQUE'))throw fail(409,'That username is taken. Try another.');throw error}user={id,username};
  }else{
   const salt=user?.salt||'1'.repeat(32),candidate=await derive(password,salt,64,{N:32768,r:8,p:1,maxmem:67108864}),expected=Buffer.from(user?.password_hash||'0'.repeat(128),'hex');if(!timingSafeEqual(candidate,expected)||!user)throw fail(401,'Username or password is incorrect.');
@@ -75,7 +79,7 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname==='/api/login'&&req.method==='POST'){await auth(req,res,'login');return}
   if(url.pathname==='/api/logout'&&req.method==='POST'){originCheck(req);const s=requireSession(req);db.prepare('UPDATE players SET active=0,updated_at=? WHERE user_id=?').run(Date.now(),s.user_id);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(s.token_hash);json(res,200,{ok:true},{'Set-Cookie':cookie('',0)});return}
   if(url.pathname==='/api/play'&&req.method==='POST'){originCheck(req);const s=requireSession(req);limit('play:'+s.user_id,180,60000);const data=await body(req);play(req,res,data,s);return}
-  if(url.pathname==='/api/leaderboard'&&req.method==='GET'){limit('board:'+req.socket.remoteAddress,240,60000);leaderboard(req,res,url);return}
+  if(url.pathname==='/api/leaderboard'&&req.method==='GET'){limit('board:'+clientAddress(req),240,60000);leaderboard(req,res,url);return}
   if(url.pathname.startsWith('/api/'))throw fail(404,'Unknown endpoint.');
   if(!['GET','HEAD'].includes(req.method))throw fail(405,'Method not allowed.');
   const pathname=decodeURIComponent(url.pathname),filename=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!filename.startsWith(root+path.sep)||!fs.existsSync(filename)||!fs.statSync(filename).isFile())throw fail(404,'Not found.');res.writeHead(200,{'Content-Type':mime[path.extname(filename)]||'application/octet-stream','Cache-Control':'no-cache'});if(req.method==='HEAD')res.end();else fs.createReadStream(filename).pipe(res);

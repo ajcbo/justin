@@ -31,5 +31,6 @@ try{
  assert.equal((await alice('/api/leaderboard?metric=invalid')).status,400);
  assert.equal((await alice('/api/logout','POST',{})).status,200);assert.equal((await alice('/api/session')).data.user,null);
  const login=await alice('/api/login','POST',{username:'ALICE_JUSTIN',password:'Test-only-passphrase-2026!'});assert.equal(login.status,200);assert.equal(login.data.state.clicks,clicked.data.state.clicks);
+ let limited=false;for(let i=0;i<21;i++){const attempt=await guest('/api/login','POST',{username:'!',password:'Test-invalid-input'},{'X-Real-IP':'192.0.2.'+(i+1)});if(attempt.status===429){limited=true;break}}assert.ok(limited,'Outside Railway, forged forwarding headers must not bypass login limits');
  console.log('Real account registration/login, private sessions, duplicate names, server-controlled scores, click rate limits, idempotent retries, purchase validation, all three rankings, ties, GOAT formula, CSRF and logout passed.');
 }finally{server.kill('SIGTERM')}

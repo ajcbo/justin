@@ -41,7 +41,7 @@ For public hosting, run the entire site and API on the same HTTPS origin. Set:
 
 On Railway, attach a persistent volume at `/data` and generate a public domain targeting port `8080`. The supplied image sets `JUSTIN_DB=/data/game.sqlite` and `HOST=0.0.0.0`. The generated `RAILWAY_PUBLIC_DOMAIN` supplies the HTTPS origin automatically. Startup refuses to run in Railway without a mounted persistent volume containing the database. The `/health` endpoint checks the database without exposing player data.
 
-HTTPS enables Secure session cookies. Public binding without an HTTPS origin is rejected. The server does not accept arbitrary forwarded-host headers. Configure your proxy to preserve the expected Host header. The initial rate limiter uses the socket address; account for shared proxy addresses when choosing a production host. One persistent server process is the intended small friends-and-family deployment; a larger multi-instance game needs shared storage and coordinated rate limiting.
+HTTPS enables Secure session cookies. Public binding without an HTTPS origin is rejected. The server does not accept arbitrary forwarded-host headers. Configure your proxy to preserve the expected Host header. On Railway only, rate limits use the edge-supplied `X-Real-IP` after validating it as an IP address. This assumes public HTTP edge ingress and a single trusted service; do not attach a TCP proxy or add untrusted services in the same environment. Other hosts use the socket address and ignore forwarding headers. See [Railway networking specifications](https://docs.railway.com/networking/public-networking/specs-and-limits). One persistent server process is the intended small friends-and-family deployment; a larger multi-instance game needs shared storage and coordinated rate limiting.
 
 GitHub Pages cannot run this Node/SQLite server. Uploading just the static files will preserve guest play, but will not create working online accounts. Do not publish real credentials or the local test database.
 
@@ -50,8 +50,9 @@ GitHub Pages cannot run this Node/SQLite server. Uploading just the static files
 ```sh
 node test-clicker.cjs
 node test-online.mjs
+node test-railway.mjs
 ```
 
-The online tests launch an isolated server with an in-memory database. They cover accounts, sessions, duplicate names, server-owned scores, rate limiting, retries, purchases, all three rankings, tied ranks, CSRF, and logout.
+The online tests launch an isolated server with an in-memory database. The Railway tests use a separate temporary database to verify account/session/progress persistence across a server restart and per-client login limits. They cover accounts, sessions, duplicate names, server-owned scores, rate limiting, retries, purchases, all three rankings, tied ranks, CSRF, and logout.
 
 Implementation references: [Node SQLite](https://nodejs.org/docs/latest-v24.x/api/sqlite.html), [Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html).

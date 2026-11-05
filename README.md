@@ -37,6 +37,7 @@ node test-growth.mjs
 node test-admin.mjs
 node test-events.mjs
 node test-access.mjs
+node test-media.mjs
 ```
 
 ## Railway deployment
@@ -45,4 +46,4 @@ Connect this repository with root directory `/`; the root Dockerfile configures 
 
 The private SQLite database is never part of GitHub or the Docker build. Use one server replica with its volume. See [server documentation](server/README.md) for security, storage and game rules.
 
-GitHub Pages serves the game files; its `justin-api-origin` meta tag points to Railway for shared accounts. The API permits only the configured game origins and uses HttpOnly, Secure, partitioned cookies for the GitHub session, plus per-session CSRF protection. Current browsers support these cookies even with ordinary third-party cookies blocked. Session tokens and passwords are never saved to JavaScript storage. Prop image sources are in [image credits](image-credits.html).
+GitHub Pages serves the game files; its `justin-api-origin` meta tag points to Railway for shared accounts. The API permits only the configured game origins and uses HttpOnly, Secure, partitioned cookies for the GitHub session, plus per-session CSRF protection. Current browsers support these cookies even with ordinary third-party cookies blocked. Session tokens and passwords are never saved to JavaScript storage. Sessions renew for 30 days of inactivity, stale-tab CSRF tokens recover, and login verifies cookie persistence. Browsers that cannot keep the cross-site cookie get a first-party account-mode link to the same public Railway game. The backdrop picker contains 27 supplied Drive images organized by collection, with cosmetic prices from 1,500 to 2,000,000 points, plus the original free white background. The full-site animated Justin Dimension can only be gifted by an admin. Backdrops save with the account or separate guest save. Settings includes a local custom click-sound waveform crop editor (5 MB / 30 seconds) saved in IndexedDB. Admin panels can silence account sounds and post timed announcements for everyone or one account. Prop image sources are in [image credits](image-credits.html).

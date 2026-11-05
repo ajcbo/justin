@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS players(user_id TEXT PRIMARY KEY REFERENCES users(id)
 CREATE TABLE IF NOT EXISTS receipts(user_id TEXT NOT NULL,request_id TEXT NOT NULL,response TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(user_id,request_id));`);
 const port=Number(process.env.PORT||8765),host=process.env.HOST||'127.0.0.1',publicOrigin=process.env.PUBLIC_ORIGIN||(process.env.RAILWAY_PUBLIC_DOMAIN?`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`:`http://127.0.0.1:${port}`);
 if(host!=='127.0.0.1'&&!publicOrigin.startsWith('https://'))throw Error('A public server requires PUBLIC_ORIGIN=https://your-domain');
-const secure=publicOrigin.startsWith('https://'),cookieName='justin_session',hash=s=>createHash('sha256').update(s).digest('hex');
+const sessionSeconds=30*86400,secure=publicOrigin.startsWith('https://'),cookieName='justin_session',hash=s=>createHash('sha256').update(s).digest('hex');
 const frontendOrigins=new Set((process.env.FRONTEND_ORIGINS||'https://ajcbo.github.io').split(',').map(s=>s.trim()).filter(Boolean));
 function crossSite(req){return frontendOrigins.has(req.headers.origin)&&req.headers.origin!==publicOrigin}
 function sessionName(req){return cookieName+(crossSite(req)?'_partitioned':'')}
@@ -38,9 +38,9 @@ function clientAddress(req){const ip=req.headers['x-real-ip'];return process.env
 function limit(key,max,windowMs){const now=Date.now(),entry=buckets.get(key);if(!entry||entry.until<now){buckets.set(key,{until:now+windowMs,count:1});return}if(++entry.count>max)throw fail(429,'Too many attempts. Please wait a few minutes.');}
 setInterval(()=>{const now=Date.now();for(const [key,value]of buckets)if(value.until<now)buckets.delete(key);db.prepare('DELETE FROM sessions WHERE expires < ?').run(now);db.prepare('DELETE FROM receipts WHERE created_at < ?').run(now-86400000)},60000).unref();
 async function body(req){if(!req.headers['content-type']?.startsWith('application/json'))throw fail(415,'Send JSON.');let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>40000)throw fail(413,'Request is too large.');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString())}catch{throw fail(400,'Invalid request.')}}
-function session(req){const name=sessionName(req),token=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1);if(!token)return null;return db.prepare('SELECT s.*,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(hash(token),Date.now())}
+function session(req){const name=sessionName(req),token=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1);if(!token)return null;const row=db.prepare('SELECT s.*,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(hash(token),Date.now());if(row&&row.expires<Date.now()+29*86400000){row.expires=Date.now()+sessionSeconds*1000;db.prepare('UPDATE sessions SET expires=? WHERE token_hash=?').run(row.expires,row.token_hash);if(req.response&&!req.response.headersSent)req.response.setHeader('Set-Cookie',cookie(req,token,sessionSeconds))}return row}
 function cookie(req,value,seconds){return `${sessionName(req)}=${value}; HttpOnly; Path=/; Max-Age=${seconds}${crossSite(req)?'; SameSite=None; Secure; Partitioned':'; SameSite=Lax'+(secure?'; Secure':'')}`}
-function issue(req,userId){const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hash(token),userId,csrf,Date.now()+7*86400000);return {csrf,cookie:cookie(req,token,7*86400)}}
+function issue(req,userId){const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hash(token),userId,csrf,Date.now()+sessionSeconds*1000);return {csrf,cookie:cookie(req,token,sessionSeconds)}}
 function player(userId){return db.prepare('SELECT * FROM players WHERE user_id=?').get(userId)}
 function publicPlayer(userId){const row=player(userId),state=G.clean(JSON.parse(row.state)),now=Date.now(),elapsed=Math.max(0,(now-row.updated_at)/1000);let offlineEarned=0;state.boosts=admin.boosts(userId,now);
  if(!maintenance&&(!row.active||elapsed>5.5)){offlineEarned=G.accrueOffline(state,elapsed,now);state.savedAt=now;G.award(state,row.best_combo);db.prepare('UPDATE players SET state=?,lifetime=?,goat=?,updated_at=?,active=0 WHERE user_id=?').run(JSON.stringify(state),state.lifetime,G.goatScore(state,row.best_combo),now,userId)}
@@ -58,29 +58,31 @@ async function auth(req,res,mode){if(maintenance&&mode==='register')throw fail(5
   const salt=user?.salt||'1'.repeat(32),candidate=await derive(password,salt,64,{N:32768,r:8,p:1,maxmem:67108864}),expected=Buffer.from(user?.password_hash||'0'.repeat(128),'hex');if(!timingSafeEqual(candidate,expected)||!user)throw fail(401,'Username or password is incorrect.');
  }
  if(maintenance&&!admin.isAdmin(user.id))throw fail(503,'Justin is under maintenance. Only the owner panel is available.');
- const old=session(req);if(old)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(old.token_hash);const issued=issue(req,user.id);json(res,200,{user:publicUser(user.id,user.username),epoch:admin.epoch(),csrf:issued.csrf,...publicPlayer(user.id),serverNow:Date.now()},{'Set-Cookie':issued.cookie});
+ const old=session(req);if(old)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(old.token_hash);const issued=issue(req,user.id);json(res,200,{user:publicUser(user.id,user.username),epoch:admin.epoch(),csrf:issued.csrf,...publicPlayer(user.id),live:admin.live(user.id),serverNow:Date.now()},{'Set-Cookie':issued.cookie});
 }
 function play(req,res,data,s){
  if(typeof data.requestId!=='string'||!/^[A-Za-z0-9-]{8,80}$/.test(data.requestId)||!Array.isArray(data.actions)||data.actions.length>100)throw fail(400,'Invalid game update.');
- if((data.epoch??1)!==admin.epoch()){json(res,409,{error:'The game has started a new season. Your progress has been refreshed.',code:'SEASON_CHANGED',user:publicUser(s.user_id,s.username),csrf:s.csrf,epoch:admin.epoch(),...publicPlayer(s.user_id),serverNow:Date.now()});return}
+ if((data.epoch??1)!==admin.epoch()){json(res,409,{error:'The game has started a new season. Your progress has been refreshed.',code:'SEASON_CHANGED',user:publicUser(s.user_id,s.username),csrf:s.csrf,epoch:admin.epoch(),...publicPlayer(s.user_id),live:admin.live(s.user_id),serverNow:Date.now()});return}
  const prior=db.prepare('SELECT response FROM receipts WHERE user_id=? AND request_id=?').get(s.user_id,data.requestId);if(prior){json(res,200,JSON.parse(prior.response));return}
  const now=Date.now(),row=player(s.user_id),state=G.clean(JSON.parse(row.state)),elapsed=(now-row.updated_at)/1000;let best=row.best_combo,combo=row.combo?JSON.parse(row.combo):null,budget=Math.min(25,row.budget+(now-row.budget_at)*.02),lastClick=row.last_click,rejected=0;
  state.boosts=admin.boosts(s.user_id,now);let offlineEarned=0;if(row.active&&elapsed>=0&&elapsed<=5.5)G.earn(state,G.passiveAmount(state,row.updated_at,now));else offlineEarned=G.accrueOffline(state,elapsed,now);
  for(const action of data.actions){if(action.kind==='click'){
    const at=Math.round(Number(action.at));if(!Number.isFinite(at)||at>now+500||at<now-15000||at<=lastClick||budget<1){rejected++;continue}budget--;lastClick=at;G.click(state,at);if(state.clicks%5000===0)G.rollGolden(state,randomInt(10)/10);combo=G.comboHit(combo,at);best=Math.max(best,combo.count);
   }else if(action.kind==='skin'){if(!G.buySkin(state,action.id))rejected++}
+  else if(action.kind==='backdrop'){if(!G.buyBackdrop(state,action.id))rejected++}
+  else if(action.kind==='equip-backdrop'){if(state.backdrops.includes(action.id))state.backdrop=action.id;else rejected++}
   else if(action.kind==='business'){if(!G.buyBusiness(state,action.id))rejected++}
   else if(action.kind==='equip'){if(state.owned.includes(action.id))state.equipped=action.id;else rejected++}
   else throw fail(400,'Unknown game action.');
  }
- G.award(state,best);const result={user:publicUser(s.user_id,s.username),epoch:admin.epoch(),state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
+ G.award(state,best);const result={live:admin.live(s.user_id),user:publicUser(s.user_id,s.username),epoch:admin.epoch(),state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
  db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE players SET state=?,combo=?,lifetime=?,pps=?,goat=?,best_combo=?,updated_at=?,active=?,budget=?,budget_at=?,last_click=? WHERE user_id=?').run(JSON.stringify(state),JSON.stringify(combo),state.lifetime,G.basePerSecond(state),G.goatScore(state,best),best,now,data.active===true?1:0,budget,now,lastClick,s.user_id);db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(s.user_id,data.requestId,JSON.stringify(result),now);db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}json(res,200,result);
 }
 const boardStatements=new Map();
 function leaderboard(req,res,url){const metric=url.searchParams.get('metric')||'lifetime',column={lifetime:'lifetime',pps:'pps',goat:'goat'}[metric];if(!column)throw fail(400,'Unknown leaderboard.');const query=`SELECT RANK() OVER(ORDER BY p.${column} DESC) AS rank,u.id,u.username,p.lifetime,p.pps,p.goat,p.best_combo,p.state FROM players p JOIN users u ON u.id=p.user_id ORDER BY p.${column} DESC,u.username_key ASC`;if(!boardStatements.has(metric))boardStatements.set(metric,db.prepare(query));const rows=boardStatements.get(metric).all().map(r=>({id:r.id,rank:r.rank,username:r.username,role:admin.publicRole(r.id),title:admin.title(r.id),lifetime:r.lifetime,pps:r.pps,goat:r.goat,bestCombo:r.best_combo,faces:JSON.parse(r.state).owned.length}));const s=session(req);json(res,200,{metric,rows:rows.slice(0,100),total:rows.length,me:s?rows.find(r=>r.id===s.user_id):null,serverNow:Date.now()})}
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.mp3':'audio/mpeg','.wav':'audio/wav','.svg':'image/svg+xml'};
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.mp3':'audio/mpeg','.wav':'audio/wav','.svg':'image/svg+xml'};
 const server=http.createServer(async(req,res)=>{
- res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');
+ req.response=res;res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');
  try{const url=new URL(req.url,publicOrigin);
   // Railway probes this path with its own Host header. It exposes no player data.
   if(url.pathname==='/health'&&req.method==='GET'){db.prepare('SELECT 1').get();json(res,200,{ok:true});return}
@@ -95,14 +97,15 @@ const server=http.createServer(async(req,res)=>{
     res.writeHead(204,{'Access-Control-Allow-Methods':'GET, POST','Access-Control-Allow-Headers':'Content-Type, X-CSRF-Token','Access-Control-Max-Age':'600','Cache-Control':'no-store'});res.end();return;
    }
   }
-  if(url.pathname==='/api/session'&&req.method==='GET'){const s=session(req);if(maintenance&&s&&!admin.isAdmin(s.user_id))throw fail(503,'Justin is under maintenance. Please check back soon.');json(res,200,s?{user:publicUser(s.user_id,s.username),epoch:admin.epoch(),csrf:s.csrf,...publicPlayer(s.user_id),serverNow:Date.now()}:{user:null,epoch:admin.epoch(),maintenance,serverNow:Date.now()});return}
+  if(url.pathname==='/api/session'&&req.method==='GET'){const s=session(req);if(maintenance&&s&&!admin.isAdmin(s.user_id))throw fail(503,'Justin is under maintenance. Please check back soon.');json(res,200,s?{user:publicUser(s.user_id,s.username),epoch:admin.epoch(),csrf:s.csrf,...publicPlayer(s.user_id),live:admin.live(s.user_id),serverNow:Date.now()}:{user:null,epoch:admin.epoch(),maintenance,serverNow:Date.now()});return}
+  if(url.pathname==='/api/live'&&req.method==='GET'){limit('live:'+clientAddress(req),120,60000);json(res,200,admin.live(session(req)?.user_id));return}
   if(url.pathname==='/api/register'&&req.method==='POST'){await auth(req,res,'register');return}
   if(url.pathname==='/api/login'&&req.method==='POST'){await auth(req,res,'login');return}
   if(url.pathname==='/api/logout'&&req.method==='POST'){originCheck(req);const s=requireSession(req);db.prepare('UPDATE players SET active=0,updated_at=? WHERE user_id=?').run(Date.now(),s.user_id);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(s.token_hash);json(res,200,{ok:true},{'Set-Cookie':cookie(req,'',0)});return}
   if(url.pathname==='/api/play'&&req.method==='POST'){if(maintenance)throw fail(503,'Justin is under maintenance. Please check back soon.');originCheck(req);const s=requireSession(req);limit('play:'+s.user_id,180,60000);const data=await body(req);play(req,res,data,s);return}
   if(url.pathname==='/api/leaderboard'&&req.method==='GET'){limit('board:'+clientAddress(req),240,60000);leaderboard(req,res,url);return}
   if(url.pathname==='/api/admin'&&req.method==='GET'){const s=session(req);if(!s)throw fail(401,'Please log in.');json(res,200,{...admin.overview(s.user_id),maintenance});return}
-  if(['/api/admin/grant','/api/admin/reset','/api/admin/restore','/api/admin/event','/api/admin/revoke','/api/admin/take','/api/admin/access','/api/admin/rank'].includes(url.pathname)&&req.method==='POST'){originCheck(req);const s=requireSession(req);if(!admin.isAdmin(s.user_id))throw fail(403,'Your account does not have admin panel access.');limit('admin:'+s.user_id,30,60000);const data=await body(req),kind=url.pathname.split('/').pop();json(res,200,admin[kind](s.user_id,data));return}
+  if(['/api/admin/grant','/api/admin/reset','/api/admin/restore','/api/admin/event','/api/admin/revoke','/api/admin/take','/api/admin/access','/api/admin/rank','/api/admin/mute','/api/admin/announce'].includes(url.pathname)&&req.method==='POST'){originCheck(req);const s=requireSession(req);if(!admin.isAdmin(s.user_id))throw fail(403,'Your account does not have admin panel access.');limit('admin:'+s.user_id,30,60000);const data=await body(req),kind=url.pathname.split('/').pop();json(res,200,admin[kind](s.user_id,data));return}
   if(url.pathname.startsWith('/api/'))throw fail(404,'Unknown endpoint.');
   if(!['GET','HEAD'].includes(req.method))throw fail(405,'Method not allowed.');
   const pathname=decodeURIComponent(url.pathname),filename=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!filename.startsWith(root+path.sep)||!fs.existsSync(filename)||!fs.statSync(filename).isFile())throw fail(404,'Not found.');res.writeHead(200,{'Content-Type':mime[path.extname(filename)]||'application/octet-stream','Cache-Control':'no-cache'});if(req.method==='HEAD')res.end();else fs.createReadStream(filename).pipe(res);

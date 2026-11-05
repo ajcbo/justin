@@ -62,3 +62,17 @@ node test-growth.mjs
 The online tests launch an isolated server with an in-memory database. The Railway tests use a separate temporary database to verify account/session/progress persistence across a server restart and per-client login limits. They cover accounts, sessions, duplicate names, server-owned scores, rate limiting, retries, purchases, all three rankings, tied ranks, CSRF, and logout.
 
 Implementation references: [Node SQLite](https://nodejs.org/docs/latest-v24.x/api/sqlite.html), [Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html).
+
+
+## Season 2 owner tools
+
+The existing account named `jacob` is bound once to an immutable account ID as owner. Only that account sees the owner panel inside the main game and can use `/api/admin/*`. The legacy admin.html address redirects into the main game with the same sign-in. The panel grants wallet points (without increasing lifetime earnings), characters or upgrade levels. All mutations require a private session, allowed origin and CSRF token, and use retry receipts and an audit log. Usernames remain unique case-insensitively, including concurrent registration.
+
+Set `MAINTENANCE=1` to pause game mutations and registration while allowing owner sign-in and maintenance tools. `node server/manage.mjs status` checks the owner, epoch, player and recovery counts. `node server/manage.mjs reset "Season 2 balance reset"` first writes a consistent private SQLite backup beside the database under `backups/`, then archives player rows inside the private database and starts a new season. Account passwords and sessions remain. The owner panel can restore archived progress; restoring also saves the replaced state. Never commit databases or backup files.
+
+Every game update includes a season epoch. Updates from older tabs are rejected with a fresh state before retry receipts are consulted, preventing stale progress from being restored. Guest saves and combo records use new season storage keys while old browser storage is retained. Golden Justin receives one 10% roll only when accepted total clicks reach a multiple of 5,000; it cannot drop in between or be purchased.
+
+
+Timed events: owner-only `/api/admin/event` creates a points delivery or multiplier for one account or everyone. Points deliveries are credited once to existing accounts; `/api/admin/revoke` removes up to the original credited amount from current wallets, preserving purchases and lifetime totals. Multipliers last 1–1,440 minutes, use the highest active factor without stacking, apply to clicks and passive income, and can be revoked early. Global multipliers cover future accounts while active; guests remain separate. Offline income integrates exactly the overlap with event starts, expiry and cancellation. Client clocks are translated for prediction; the server uses its own schedules and ignores supplied boosts. Permanent base PPS feeds PPS/GOAT rankings.
+
+Performance: photo variants load when their shop cards approach the viewport or they are equipped. Cached 384×600 sprites are reused. Passive balance display updates at 10 Hz with throttled shop updates; taps stay immediate. Rendering pauses offscreen, in hidden tabs and behind dialogs. Adaptive quality limits duplicate heads, particles and strips, and switches to a 30 FPS/1× canvas path after sustained slow frames.

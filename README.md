@@ -4,11 +4,11 @@ A deliberately goofy clicker game starring Justin Tangarorang, with optional acc
 
 [Play Justin Clicker](https://ajcbo.github.io/justin/)
 
-GitHub Pages is the main game address. Accounts, ranked saves and shared leaderboards use the existing Railway server in the background. Guest saves remain in the GitHub browser origin. Existing account usernames, passwords and ranked progress are unchanged; sign in again from the GitHub address.
+GitHub Pages is the main game address. Accounts, ranked saves and shared leaderboards use the existing Railway server in the background. Guest saves remain in the GitHub browser origin. Existing account usernames and passwords are unchanged; game progress starts fresh for season 2; sign in again from the GitHub address.
 
 ## Play
 
-Click Justin to earn points and change his dance. The voice stays normal for the first 10 hits and gradually reaches its two-octave ceiling at 210 hits. Collect 18 Justins, including Miles Morales, a screaming Hamster Justin using his own face/skin colour, eight supplied photo variants and a rare Golden Justin. Golden Justin drops at 1 in 1,500 accepted clicks and cannot be bought; its +250 click boost is permanent. The earlier 24-karat skin remains a normal purchase.
+Click Justin to earn points and change his dance. The voice stays normal for the first 10 hits and gradually reaches its two-octave ceiling at 210 hits. Collect 18 Justins, including Miles Morales, a screaming Hamster Justin using his own face/skin colour, eight supplied photo variants and a rare Golden Justin. Golden Justin has a 10% chance at each 5,000-click milestone, with no rolls in between and cannot be bought; its +250 click boost is permanent. The earlier 24-karat skin remains a normal purchase.
 
 Earn passive income at full speed while active and 25% while away, capped at 24 hours per return. The displayed daily offline estimate is PPS × 21,600. Ranked offline time and rare rolls are calculated by the server. Offline receipts appear after absences of at least 30 seconds; smaller gaps still accrue the reduced income. Sixteen permanent achievements track clicks, combos, income, collection and lucky discoveries.
 
@@ -16,7 +16,7 @@ Click effects include comic bonks, confetti, rubber panic and afterimages, plus 
 
 On iPhone/iPad, an animated image layer backs up the canvas face; it is also available as “simple face display (iPhone fix)” in Settings. Character colour treatments are prepared in small sprites instead of depending on canvas filters. Prop processing and canvas resolution are bounded to reduce mobile memory use.
 
-Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. Password recovery, admin events and an admin panel are not included yet.
+Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. The existing jacob account has a protected owner panel inside the main game for points, characters and upgrade gifts. Season resets retain accounts and archive progress for recovery. Password recovery and live admin events are not included. Thirteen gear and passive upgrades accompany slower character progression. The owner can give points to one player or all existing accounts, reclaim up to the gifted amount from current wallets, and start 1–1,440 minute multipliers for one account or everyone. Boosts affect clicks and passive earnings only during their time window, automatically expire, can be ended early, and do not stack; the strongest wins. Global boosts include accounts created during the event. Guest saves are independent of server events. PPS rankings use permanent base production so event expiry cannot leave inflated rankings.
 
 ## Online server
 
@@ -34,6 +34,8 @@ node test-online.mjs
 node test-railway.mjs
 node test-cross-origin.mjs
 node test-growth.mjs
+node test-admin.mjs
+node test-events.mjs
 ```
 
 ## Railway deployment

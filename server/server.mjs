@@ -1,6 +1,6 @@
 import http from 'node:http';
 import {DatabaseSync} from 'node:sqlite';
-import {randomBytes,createHash,scrypt,timingSafeEqual} from 'node:crypto';
+import {randomBytes,randomInt,createHash,scrypt,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
@@ -39,7 +39,9 @@ function session(req){const name=sessionName(req),token=String(req.headers.cooki
 function cookie(req,value,seconds){return `${sessionName(req)}=${value}; HttpOnly; Path=/; Max-Age=${seconds}${crossSite(req)?'; SameSite=None; Secure; Partitioned':'; SameSite=Lax'+(secure?'; Secure':'')}`}
 function issue(req,userId){const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hash(token),userId,csrf,Date.now()+7*86400000);return {csrf,cookie:cookie(req,token,7*86400)}}
 function player(userId){return db.prepare('SELECT * FROM players WHERE user_id=?').get(userId)}
-function publicPlayer(userId){const row=player(userId);return {state:G.clean(JSON.parse(row.state)),bestCombo:row.best_combo}}
+function publicPlayer(userId){const row=player(userId),state=G.clean(JSON.parse(row.state)),now=Date.now(),elapsed=Math.max(0,(now-row.updated_at)/1000);let offlineEarned=0;
+ if(!row.active||elapsed>5.5){offlineEarned=G.accrueOffline(state,elapsed);state.savedAt=now;G.award(state,row.best_combo);db.prepare('UPDATE players SET state=?,lifetime=?,goat=?,updated_at=?,active=0 WHERE user_id=?').run(JSON.stringify(state),state.lifetime,G.goatScore(state,row.best_combo),now,userId)}
+ return {state,bestCombo:row.best_combo,offlineEarned:elapsed>=30?offlineEarned:0}}
 function requireSession(req){const s=session(req);if(!s)throw fail(401,'Please log in again.');if(req.headers['x-csrf-token']!==s.csrf)throw fail(403,'Session check failed. Refresh and try again.');return s}
 function originCheck(req){if(req.headers.origin!==publicOrigin&&!frontendOrigins.has(req.headers.origin))throw fail(403,'This request must come from the game website.');}
 async function auth(req,res,mode){originCheck(req);limit('auth:'+clientAddress(req),20,600000);const data=await body(req),username=typeof data.username==='string'?data.username.trim():'',password=typeof data.password==='string'?data.password:'';
@@ -58,15 +60,15 @@ function play(req,res,data,s){
  if(typeof data.requestId!=='string'||!/^[A-Za-z0-9-]{8,80}$/.test(data.requestId)||!Array.isArray(data.actions)||data.actions.length>100)throw fail(400,'Invalid game update.');
  const prior=db.prepare('SELECT response FROM receipts WHERE user_id=? AND request_id=?').get(s.user_id,data.requestId);if(prior){json(res,200,JSON.parse(prior.response));return}
  const now=Date.now(),row=player(s.user_id),state=G.clean(JSON.parse(row.state)),elapsed=(now-row.updated_at)/1000;let best=row.best_combo,combo=row.combo?JSON.parse(row.combo):null,budget=Math.min(25,row.budget+(now-row.budget_at)*.02),lastClick=row.last_click,rejected=0;
- if(row.active&&elapsed>=0&&elapsed<=5.5)G.earn(state,G.perSecond(state)*elapsed);
+ let offlineEarned=0;if(row.active&&elapsed>=0&&elapsed<=5.5)G.earn(state,G.perSecond(state)*elapsed);else offlineEarned=G.accrueOffline(state,elapsed);
  for(const action of data.actions){if(action.kind==='click'){
-   const at=Math.round(Number(action.at));if(!Number.isFinite(at)||at>now+500||at<now-15000||at<=lastClick||budget<1){rejected++;continue}budget--;lastClick=at;G.click(state);combo=G.comboHit(combo,at);best=Math.max(best,combo.count);
+   const at=Math.round(Number(action.at));if(!Number.isFinite(at)||at>now+500||at<now-15000||at<=lastClick||budget<1){rejected++;continue}budget--;lastClick=at;G.click(state);G.rollGolden(state,randomInt(1500)/1500);combo=G.comboHit(combo,at);best=Math.max(best,combo.count);
   }else if(action.kind==='skin'){if(!G.buySkin(state,action.id))rejected++}
   else if(action.kind==='business'){if(!G.buyBusiness(state,action.id))rejected++}
   else if(action.kind==='equip'){if(state.owned.includes(action.id))state.equipped=action.id;else rejected++}
   else throw fail(400,'Unknown game action.');
  }
- const result={...{state,bestCombo:best},rejected,serverNow:now};state.savedAt=now;
+ G.award(state,best);const result={state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
  db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE players SET state=?,combo=?,lifetime=?,pps=?,goat=?,best_combo=?,updated_at=?,active=?,budget=?,budget_at=?,last_click=? WHERE user_id=?').run(JSON.stringify(state),JSON.stringify(combo),state.lifetime,G.perSecond(state),G.goatScore(state,best),best,now,data.active===true?1:0,budget,now,lastClick,s.user_id);db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(s.user_id,data.requestId,JSON.stringify(result),now);db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}json(res,200,result);
 }
 function leaderboard(req,res,url){const metric=url.searchParams.get('metric')||'lifetime',column={lifetime:'lifetime',pps:'pps',goat:'goat'}[metric];if(!column)throw fail(400,'Unknown leaderboard.');const query=`SELECT RANK() OVER(ORDER BY p.${column} DESC) AS rank,u.id,u.username,p.lifetime,p.pps,p.goat,p.best_combo,p.state FROM players p JOIN users u ON u.id=p.user_id ORDER BY p.${column} DESC,u.username_key ASC`;const rows=db.prepare(query).all().map(r=>({id:r.id,rank:r.rank,username:r.username,lifetime:r.lifetime,pps:r.pps,goat:r.goat,bestCombo:r.best_combo,faces:JSON.parse(r.state).owned.length}));const s=session(req);json(res,200,{metric,rows:rows.slice(0,100),total:rows.length,me:s?rows.find(r=>r.id===s.user_id):null,serverNow:Date.now()})}

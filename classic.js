@@ -8,12 +8,13 @@ let bassAverage=.15,lastBass=0,lastLive=-1,musicGeneration=0,customUrl;
 const original=new Image(),cut=document.createElement('canvas');cut.width=820;cut.height=1280;
 const colors=['#ff00cc','#00bfff','#98ee00','#ffb500','#9055ff'];
 $('gentle').checked=matchMedia('(prefers-reduced-motion: reduce)').matches;
-function redrawFace(){const c=cut.getContext('2d');c.resetTransform();c.clearRect(0,0,820,1280);c.save();
+function redrawFace(){const c=cut.getContext('2d');c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,820,1280);c.save();
  if(customImage){if($('oval').checked){c.beginPath();c.ellipse(410,640,405,635,0,0,Math.PI*2);c.clip()}const scale=Math.max(820/customImage.width,1280/customImage.height)*Number($('crop-zoom').value);const iw=customImage.width*scale,ih=customImage.height*scale;c.drawImage(customImage,(820-iw)/2,(1280-ih)/2+Number($('crop-y').value)*640,iw,ih)}
  else{c.translate(-125,-635);c.beginPath();c.moveTo(168,1190);c.bezierCurveTo(125,1080,130,925,202,826);c.bezierCurveTo(281,699,408,642,536,649);c.bezierCurveTo(677,646,838,729,902,852);c.bezierCurveTo(946,931,921,1083,903,1186);c.bezierCurveTo(970,1176,953,1358,903,1371);c.bezierCurveTo(884,1517,844,1726,736,1831);c.bezierCurveTo(670,1892,548,1923,467,1868);c.bezierCurveTo(335,1812,278,1643,246,1419);c.bezierCurveTo(176,1440,153,1295,168,1190);c.closePath();c.clip();c.drawImage(original,0,0)}c.restore();faceReady=true;faceRevision++;
 }
-original.onload=redrawFace;original.src='assets/friend.png';
-function resize(){const r=canvas.getBoundingClientRect();w=r.width;h=r.height;const d=Math.min(devicePixelRatio||1,2);canvas.width=w*d;canvas.height=h*d;ctx.setTransform(d,0,0,d,0,0)}new ResizeObserver(resize).observe(canvas);
+original.onload=redrawFace;original.onerror=()=>toast('Photo failed to load. Refresh to retry.');original.src='assets/friend.png';
+function resize(){const r=canvas.getBoundingClientRect();w=r.width;h=r.height;const d=Math.min(devicePixelRatio||1,1.5,4096/Math.max(w,h));canvas.width=Math.max(1,Math.round(w*d));canvas.height=Math.max(1,Math.round(h*d));ctx.setTransform(d,0,0,d,0,0)}if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize);resize();
+const faceDOM=$('face-dom'),faceDOMImage=faceDOM.querySelector('img');let faceDOMKey='';$('safe-face').checked=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.remove('show'),3200)}
 function setupAudio(){if(ac)return;const C=window.AudioContext||window.webkitAudioContext;if(!C)return;ac=new C();analyser=ac.createAnalyser();analyser.fftSize=1024;analyser.smoothingTimeConstant=.2;spectrum=new Uint8Array(analyser.frequencyBinCount);ac.createMediaElementSource(audio).connect(analyser);analyser.connect(ac.destination)}
 async function play(automatic=false){if(busy)return;busy=true;try{if(!automatic){setupAudio();const resumed=ac?ac.resume():Promise.resolve();const started=audio.play();await Promise.all([resumed,started])}else await audio.play()}catch(error){if(error.name==='NotAllowedError'){needsTap=true;$('status').textContent='tap literally anything to start the music';$('play').textContent='▶ tap to unleash him'}else if(error.name!=='AbortError')toast('could not play that audio. try another file?')}finally{busy=false}}
@@ -82,9 +83,13 @@ function frame(ms){requestAnimationFrame(frame);const now=ms/1000,dt=Math.min(no
  if(mode===9){sx=1.6+kick*.6;sy=.3+Math.abs(kick)*.25;y=h*.78}
  if(mode===10){sx=sy=1+impact*power*.65;rot=kick*.1}
  if(mode===11){for(let i=0;i<6;i++)head(w*(i%3+1)/4,h*(Math.floor(i/3)+1)/3,size*.35,(i%2?1:-1)*kick*.3);sx=1+kick*.4;sy=1-kick*.25}
+ if(window.justinClicker?.skin.id==='sleepy'){sx*=1.35;sy*=.75}
+ if(window.justinClicker?.skin.id==='hamster'){sx*=1.2;sy*=.85}
  if(window.justinClicker?.skin.id==='wide'){sx*=1.5;sy*=.82}
  ({x,y,rot,sx,sy}=mischief.apply({x,y,size,rot,sx:Math.max(.2,sx),sy:Math.max(.2,sy)},dt,now));
  head(x,y,size,rot,sx,sy,1,warp);
+ if(faceReady){const safe=$('safe-face').checked;faceDOM.hidden=!safe;if(safe){const key=(window.justinClicker?.skin.id||'normal')+':'+faceRevision+':'+(window.JustinSprites?.version||0);if(key!==faceDOMKey){faceDOMKey=key;const url=window.JustinSprites?.url(window.justinClicker?.skin);if(url){faceDOMImage.src=url;faceDOM.classList.add('prepared')}}faceDOM.style.animation='none';faceDOM.style.left=x+'px';faceDOM.style.top=y+'px';faceDOM.style.width=size+'px';faceDOM.style.height=size*1.56+'px';faceDOM.style.transform=`translate(-50%,-50%) rotate(${rot}rad) scale(${sx},${sy})`}}
+
  const faceButton=$('face-button');faceButton.style.left=x+'px';faceButton.style.top=y+'px';faceButton.style.width=size*Math.max(.6,sx)+'px';faceButton.style.height=size*1.56*Math.max(.6,sy)+'px';faceButton.style.transform=`translate(-50%,-50%) rotate(${rot}rad)`;
  for(const ring of rings){ring.life-=dt;ctx.save();ctx.globalAlpha=Math.max(0,ring.life)*.7;ctx.strokeStyle=ring.color;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(w/2,h*.88,(.55-ring.life)*size*2+size*.3,8+(.55-ring.life)*30,0,0,Math.PI*2);ctx.stroke();ctx.restore()}rings=rings.filter(r=>r.life>0);
  for(const part of particles){part.life-=dt;part.x+=part.vx*dt;part.y+=part.vy*dt;part.vy+=400*dt;ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,part.life*2));ctx.fillStyle=part.color;if(part.symbol){ctx.font='20px serif';ctx.fillText(part.symbol,part.x,part.y)}else ctx.fillRect(part.x,part.y,6,6);ctx.restore()}particles=particles.filter(q=>q.life>0);

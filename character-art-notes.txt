@@ -1,0 +1,10 @@
+Character art notes
+
+The original face and eight supplied photo variants are unchanged source photos, cropped into small sprites at runtime. Miles Morales Justin uses the original face with game-drawn black-and-red costume details. Colour variants use cached pixel treatments.
+
+Hamster Justin uses the built-in image generation tool. Final saved project path: assets/characters/hamster.png. Reference targets: the user-provided smug Justin photo and the screaming hamster meme.
+
+Final prompt:
+EDIT Justin from FIRST PHOTO into a cursed screaming hamster MEME deformation. CRITICAL: KEEP HIS ACTUAL PHOTOGRAPHIC HUMAN FACE, HIS NATURAL MEDIUM TAN/BROWN SKIN COLOUR, BLACK HAIR, RECOGNIZABLE EYES/NOSE. No white skin, no fur, no generic hamster face, no cartoon replacement face. SECOND IMAGE is only a pose and distortion reference: squat triangular wide lower body/head, eyes upturned from laughing, gigantic wide-open black laughing mouth with two silly buck teeth, tiny arms. Stretch and distort Justin's real photographic head into that silhouette, keeping his actual skin colour over the whole character; add tiny skin-coloured arms and ears. Intentionally terrible low-resolution Photoshop meme collage. Entire character visible in portrait framing, centered with full black fringe/hair and generous transparent margins. No text or watermark. This must look like human Justin distorted into that hamster meme, not a white animal wearing his hair.
+
+Built-in tool used; no paid API/CLI fallback. Discarded hamster styles were not used.

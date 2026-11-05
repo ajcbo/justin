@@ -24,7 +24,9 @@ Open `http://127.0.0.1:8765/`. On Windows, you can instead double-click `Start-J
 
 The server computes balances, purchases, passive rates and GOAT scores from game actions. It does not accept client-submitted balances. Clicks are limited to an average of 20 per second with a small burst allowance; timestamps are bounded and monotonic. The rate limit is a practical guard, not a guarantee against bots or all cheating.
 
-Updates have idempotency keys so a network retry cannot grant the same clicks twice. Ranked progress pauses on connection failure and reconnects without overwriting the guest save. Passive gains require a recent active heartbeat and do not accrue during long offline gaps.
+Updates have idempotency keys so a network retry cannot grant the same clicks twice. Ranked progress pauses on connection failure and reconnects without overwriting the guest save. Active heartbeats earn full passive income. Gaps with no recent active heartbeat earn 25%, capped at 24 hours per settlement. The server uses its own stored update timestamps; client-submitted times and balances cannot claim offline rewards. Login/session restoration and returning play updates settle the reward once, update lifetime and GOAT rankings, and return the amount for the welcome receipt. Receipts are shown for absences of at least 30 seconds; shorter gaps still earn reduced income.
+
+Each accepted click has a 1-in-1,500 cryptographically sampled chance to unlock Golden Justin once. The skin cannot be purchased. Retry receipts prevent rerolling or double-crediting. Achievements are computed from server-owned game progress and stored in the existing player state. Old version-1 saves preserve their points, upgrades and existing skins.
 
 Passwords use scrypt with a random salt. Database sessions store a SHA-256 hash of a random session token and expire after seven days. Browser sessions use HttpOnly cookies. Direct Railway sessions use SameSite=Lax. The GitHub frontend uses a separate Secure, SameSite=None, Partitioned cookie, which current browsers isolate to the GitHub top-level site. State changes require an explicitly allowed Origin plus a per-session CSRF token. Session secrets remain in HttpOnly cookies and are never returned as JavaScript tokens. The API returns no password hashes or session tokens to the leaderboard. Authentication attempts and game updates are rate limited. SQLite statements use bound parameters.
 
@@ -54,6 +56,7 @@ node test-clicker.cjs
 node test-online.mjs
 node test-railway.mjs
 node test-cross-origin.mjs
+node test-growth.mjs
 ```
 
 The online tests launch an isolated server with an in-memory database. The Railway tests use a separate temporary database to verify account/session/progress persistence across a server restart and per-client login limits. They cover accounts, sessions, duplicate names, server-owned scores, rate limiting, retries, purchases, all three rankings, tied ranks, CSRF, and logout.

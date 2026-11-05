@@ -8,7 +8,13 @@ GitHub Pages is the main game address. Accounts, ranked saves and shared leaderb
 
 ## Play
 
-Click Justin to earn points and change his dance. Click quickly for a combo and an increasingly high voice. Unlock face versions and buy passive upgrades. Justin keeps dancing even without music. Apple Music remains an optional mode.
+Click Justin to earn points and change his dance. The voice stays normal for the first 10 hits and gradually reaches its two-octave ceiling at 210 hits. Collect 18 Justins, including Miles Morales, a screaming Hamster Justin using his own face/skin colour, eight supplied photo variants and a rare Golden Justin. Golden Justin drops at 1 in 1,500 accepted clicks and cannot be bought; its +250 click boost is permanent. The earlier 24-karat skin remains a normal purchase.
+
+Earn passive income at full speed while active and 25% while away, capped at 24 hours per return. The displayed daily offline estimate is PPS × 21,600. Ranked offline time and rare rolls are calculated by the server. Offline receipts appear after absences of at least 30 seconds; smaller gaps still accrue the reduced income. Sixteen permanent achievements track clicks, combos, income, collection and lucky discoveries.
+
+Click effects include comic bonks, confetti, rubber panic and afterimages, plus launch/photocopier toys. Reduced-motion settings suppress extra effects. Justin keeps dancing without music. Apple Music remains an optional mode.
+
+On iPhone/iPad, an animated image layer backs up the canvas face; it is also available as “simple face display (iPhone fix)” in Settings. Character colour treatments are prepared in small sprites instead of depending on canvas filters. Prop processing and canvas resolution are bounded to reduce mobile memory use.
 
 Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. Password recovery, admin events and an admin panel are not included yet.
 
@@ -27,6 +33,7 @@ node test-clicker.cjs
 node test-online.mjs
 node test-railway.mjs
 node test-cross-origin.mjs
+node test-growth.mjs
 ```
 
 ## Railway deployment

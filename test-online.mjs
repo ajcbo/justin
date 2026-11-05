@@ -20,9 +20,9 @@ try{
  assert.equal((await guest('/api/login','POST',{username:'Alice_Justin',password:'wrong-password-2026'})).status,401);
  const injection=await alice('/api/play','POST',{requestId:'inject001',actions:[],active:true,state:{bank:1e15,lifetime:1e15}});assert.equal(injection.data.state.bank,0);
  const now=Date.now(),actions=Array.from({length:100},(_,i)=>({kind:'click',at:now-2000+i*20}));
- const clicked=await alice('/api/play','POST',{requestId:'clicks001',actions,active:true});assert.equal(clicked.status,200);assert.ok(clicked.data.state.clicks>0);assert.ok(clicked.data.state.clicks<=25);assert.ok(clicked.data.rejected>0);assert.equal(clicked.data.state.lifetime,clicked.data.state.clicks);
+ const clicked=await alice('/api/play','POST',{requestId:'clicks001',actions,active:true});assert.equal(clicked.status,200);assert.ok(clicked.data.state.clicks>0);assert.ok(clicked.data.state.clicks<=25);assert.ok(clicked.data.rejected>0);assert.ok(clicked.data.state.lifetime>=clicked.data.state.clicks);
  const replay=await alice('/api/play','POST',{requestId:'clicks001',actions,active:true});assert.deepEqual(replay.data,clicked.data,'Retries must not double-credit clicks');
- const buy=await alice('/api/play','POST',{requestId:'unafford01',actions:[{kind:'skin',id:'fried'}],active:true});assert.equal(buy.data.state.bank,clicked.data.state.bank);assert.equal(buy.data.rejected,1);
+ const buy=await alice('/api/play','POST',{requestId:'unafford01',actions:[{kind:'skin',id:'hamster'}],active:true});assert.equal(buy.data.state.bank,clicked.data.state.bank);assert.equal(buy.data.rejected,1);
  const forged=await alice('/api/play','POST',{requestId:'future001',actions:[{kind:'click',at:Date.now()+100000}],active:true});assert.equal(forged.data.state.clicks,clicked.data.state.clicks);
  assert.equal((await alice('/api/play','POST',{requestId:'csrf0011',actions:[]},{'X-CSRF-Token':'invalid'})).status,403);
  assert.equal((await alice('/api/play','POST',{requestId:'origin001',actions:[]},{Origin:'https://unrelated.example'})).status,403);

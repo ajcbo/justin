@@ -17,8 +17,19 @@ assert.equal(corrupted.bank,0);assert.equal(corrupted.equipped,'normal');assert.
 console.log('Click rewards, face unlocks, cumulative boosts, upgrade prices, passive earnings and save recovery passed.');
 let combo=null,previousRate=0;
 for(let i=0;i<50;i++){combo=G.comboHit(combo,i*100);assert.equal(combo.count,i+1);assert.ok(combo.rate>=previousRate);assert.ok(combo.rate<=4);previousRate=combo.rate}
-assert.equal(combo.tier,4);assert.equal(combo.rate,4);
+assert.equal(combo.tier,2);assert.ok(combo.rate<1.4,'Voice must rise gradually');
+assert.equal(G.comboHit({count:9,at:0},100).rate,1);
+for(let i=50;i<210;i++)combo=G.comboHit(combo,i*100);assert.equal(combo.rate,4);assert.equal(combo.tier,4);
 combo=G.comboHit(combo,combo.at+G.comboWindow+1);assert.equal(combo.count,1);assert.equal(combo.rate,1);assert.equal(combo.tier,0);
 combo=G.comboHit(combo,combo.at+G.comboWindow);assert.equal(combo.count,2);
 assert.equal(G.comboHit({count:9999,at:0},100).count,9999);
 console.log('Fast-click combo, rising pitch, pitch ceiling, expiry and boundary timing passed.');
+
+const old=G.clean({version:1,bank:100,lifetime:200,clicks:50,owned:['normal','gold'],equipped:'gold',levels:{chat:2},savedAt:1});
+assert.equal(old.equipped,'gold');assert.equal(G.offlinePerDay(old),43200);
+assert.equal(G.accrueOffline(old,30*3600),43200);assert.equal(old.bank,43300);assert.equal(old.offlineTotal,43200);
+assert.equal(G.accrueOffline(old,-10),0);
+assert.equal(G.buySkin(old,'lucky-gold'),false);assert.equal(G.rollGolden(old,1/1500),false);assert.equal(G.rollGolden(old,NaN),false);
+const power=G.perClick(old);assert.equal(G.rollGolden(old,0),true);assert.equal(G.perClick(old),power+250);assert.equal(G.rollGolden(old,0),false);
+const badges=G.award(old,210);assert.ok(badges.includes('golden'));assert.ok(badges.includes('offline'));assert.ok(badges.includes('combo200'));assert.equal(G.award(old,210).length,0);
+console.log('Old saves, offline rate/day/cap, rare unlock eligibility, permanent boosts and one-time achievements passed.');

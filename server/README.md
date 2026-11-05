@@ -26,13 +26,15 @@ The server computes balances, purchases, passive rates and GOAT scores from game
 
 Updates have idempotency keys so a network retry cannot grant the same clicks twice. Ranked progress pauses on connection failure and reconnects without overwriting the guest save. Passive gains require a recent active heartbeat and do not accrue during long offline gaps.
 
-Passwords use scrypt with a random salt. Database sessions store a SHA-256 hash of a random session token and expire after seven days. Browser sessions use HttpOnly/SameSite cookies; state changes require a same-origin request plus a per-session CSRF token. The API returns no password hashes or session tokens to the leaderboard. Authentication attempts and game updates are rate limited. SQLite statements use bound parameters.
+Passwords use scrypt with a random salt. Database sessions store a SHA-256 hash of a random session token and expire after seven days. Browser sessions use HttpOnly cookies. Direct Railway sessions use SameSite=Lax. The GitHub frontend uses a separate Secure, SameSite=None, Partitioned cookie, which current browsers isolate to the GitHub top-level site. State changes require an explicitly allowed Origin plus a per-session CSRF token. Session secrets remain in HttpOnly cookies and are never returned as JavaScript tokens. The API returns no password hashes or session tokens to the leaderboard. Authentication attempts and game updates are rate limited. SQLite statements use bound parameters.
 
 ## Persistence and hosting
 
 Default data lives in `server/data/game.sqlite`. This private database, including its `-wal` and `-shm` files, must never be served as static files or committed to GitHub. Back it up using a consistent SQLite backup procedure and restrict filesystem access to the server process.
 
-For public hosting, run the entire site and API on the same HTTPS origin. Set:
+The main public game runs at `https://ajcbo.github.io/justin/`, with its static HTML meta tag `justin-api-origin` pointing to the Railway API. The frontend stays on GitHub and uses credentialed fetch calls. Railway also serves the same game directly. CORS allows exactly `https://ajcbo.github.io` by default, never all GitHub Pages owners or a wildcard. `FRONTEND_ORIGINS` can override this comma-separated allowlist. API preflights allow GET/POST, Content-Type and X-CSRF-Token only. The server still validates its own Host header.
+
+For the HTTPS API server, set:
 
 - `PUBLIC_ORIGIN=https://your-real-game-domain`
 - `HOST=0.0.0.0`
@@ -43,7 +45,7 @@ On Railway, attach a persistent volume at `/data` and generate a public domain t
 
 HTTPS enables Secure session cookies. Public binding without an HTTPS origin is rejected. The server does not accept arbitrary forwarded-host headers. Configure your proxy to preserve the expected Host header. On Railway only, rate limits use the edge-supplied `X-Real-IP` after validating it as an IP address. This assumes public HTTP edge ingress and a single trusted service; do not attach a TCP proxy or add untrusted services in the same environment. Other hosts use the socket address and ignore forwarding headers. See [Railway networking specifications](https://docs.railway.com/networking/public-networking/specs-and-limits). One persistent server process is the intended small friends-and-family deployment; a larger multi-instance game needs shared storage and coordinated rate limiting.
 
-GitHub Pages cannot run this Node/SQLite server. Uploading just the static files will preserve guest play, but will not create working online accounts. Do not publish real credentials or the local test database.
+GitHub Pages cannot run the Node/SQLite server. Keep Railway running for account and leaderboard requests; the GitHub frontend alone provides guest play. An existing account can sign in on either host, with separate browser sessions and the same ranked save. Do not publish real credentials or the local test database.
 
 ## Tests
 
@@ -51,6 +53,7 @@ GitHub Pages cannot run this Node/SQLite server. Uploading just the static files
 node test-clicker.cjs
 node test-online.mjs
 node test-railway.mjs
+node test-cross-origin.mjs
 ```
 
 The online tests launch an isolated server with an in-memory database. The Railway tests use a separate temporary database to verify account/session/progress persistence across a server restart and per-client login limits. They cover accounts, sessions, duplicate names, server-owned scores, rate limiting, retries, purchases, all three rankings, tied ranks, CSRF, and logout.

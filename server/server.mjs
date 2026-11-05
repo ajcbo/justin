@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS receipts(user_id TEXT NOT NULL,request_id TEXT NOT NU
 const port=Number(process.env.PORT||8765),host=process.env.HOST||'127.0.0.1',publicOrigin=process.env.PUBLIC_ORIGIN||(process.env.RAILWAY_PUBLIC_DOMAIN?`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`:`http://127.0.0.1:${port}`);
 if(host!=='127.0.0.1'&&!publicOrigin.startsWith('https://'))throw Error('A public server requires PUBLIC_ORIGIN=https://your-domain');
 const secure=publicOrigin.startsWith('https://'),cookieName='justin_session',hash=s=>createHash('sha256').update(s).digest('hex');
+const frontendOrigins=new Set((process.env.FRONTEND_ORIGINS||'https://ajcbo.github.io').split(',').map(s=>s.trim()).filter(Boolean));
+function crossSite(req){return frontendOrigins.has(req.headers.origin)&&req.headers.origin!==publicOrigin}
+function sessionName(req){return cookieName+(crossSite(req)?'_partitioned':'')}
 const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data))};
 const fail=(status,message)=>Object.assign(Error(message),{status});
 const buckets=new Map();
@@ -32,13 +35,13 @@ function clientAddress(req){const ip=req.headers['x-real-ip'];return process.env
 function limit(key,max,windowMs){const now=Date.now(),entry=buckets.get(key);if(!entry||entry.until<now){buckets.set(key,{until:now+windowMs,count:1});return}if(++entry.count>max)throw fail(429,'Too many attempts. Please wait a few minutes.');}
 setInterval(()=>{const now=Date.now();for(const [key,value]of buckets)if(value.until<now)buckets.delete(key);db.prepare('DELETE FROM sessions WHERE expires < ?').run(now);db.prepare('DELETE FROM receipts WHERE created_at < ?').run(now-86400000)},60000).unref();
 async function body(req){if(!req.headers['content-type']?.startsWith('application/json'))throw fail(415,'Send JSON.');let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>40000)throw fail(413,'Request is too large.');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString())}catch{throw fail(400,'Invalid request.')}}
-function session(req){const token=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!token)return null;return db.prepare('SELECT s.*,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(hash(token),Date.now())}
-function cookie(value,seconds){return `${cookieName}=${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${seconds}${secure?'; Secure':''}`}
-function issue(userId){const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hash(token),userId,csrf,Date.now()+7*86400000);return {csrf,cookie:cookie(token,7*86400)}}
+function session(req){const name=sessionName(req),token=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='))?.slice(name.length+1);if(!token)return null;return db.prepare('SELECT s.*,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(hash(token),Date.now())}
+function cookie(req,value,seconds){return `${sessionName(req)}=${value}; HttpOnly; Path=/; Max-Age=${seconds}${crossSite(req)?'; SameSite=None; Secure; Partitioned':'; SameSite=Lax'+(secure?'; Secure':'')}`}
+function issue(req,userId){const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hash(token),userId,csrf,Date.now()+7*86400000);return {csrf,cookie:cookie(req,token,7*86400)}}
 function player(userId){return db.prepare('SELECT * FROM players WHERE user_id=?').get(userId)}
 function publicPlayer(userId){const row=player(userId);return {state:G.clean(JSON.parse(row.state)),bestCombo:row.best_combo}}
 function requireSession(req){const s=session(req);if(!s)throw fail(401,'Please log in again.');if(req.headers['x-csrf-token']!==s.csrf)throw fail(403,'Session check failed. Refresh and try again.');return s}
-function originCheck(req){if(req.headers.origin!==publicOrigin)throw fail(403,'This request must come from the game website.');}
+function originCheck(req){if(req.headers.origin!==publicOrigin&&!frontendOrigins.has(req.headers.origin))throw fail(403,'This request must come from the game website.');}
 async function auth(req,res,mode){originCheck(req);limit('auth:'+clientAddress(req),20,600000);const data=await body(req),username=typeof data.username==='string'?data.username.trim():'',password=typeof data.password==='string'?data.password:'';
  if(!/^[A-Za-z0-9_]{3,20}$/.test(username))throw fail(400,'Use 3–20 letters, numbers, or underscores for your username.');
  if(password.length<10||password.length>128)throw fail(400,'Use a password between 10 and 128 characters.');
@@ -49,7 +52,7 @@ async function auth(req,res,mode){originCheck(req);limit('auth:'+clientAddress(r
  }else{
   const salt=user?.salt||'1'.repeat(32),candidate=await derive(password,salt,64,{N:32768,r:8,p:1,maxmem:67108864}),expected=Buffer.from(user?.password_hash||'0'.repeat(128),'hex');if(!timingSafeEqual(candidate,expected)||!user)throw fail(401,'Username or password is incorrect.');
  }
- const old=session(req);if(old)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(old.token_hash);const issued=issue(user.id);json(res,200,{user:{id:user.id,username:user.username},csrf:issued.csrf,...publicPlayer(user.id),serverNow:Date.now()},{'Set-Cookie':issued.cookie});
+ const old=session(req);if(old)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(old.token_hash);const issued=issue(req,user.id);json(res,200,{user:{id:user.id,username:user.username},csrf:issued.csrf,...publicPlayer(user.id),serverNow:Date.now()},{'Set-Cookie':issued.cookie});
 }
 function play(req,res,data,s){
  if(typeof data.requestId!=='string'||!/^[A-Za-z0-9-]{8,80}$/.test(data.requestId)||!Array.isArray(data.actions)||data.actions.length>100)throw fail(400,'Invalid game update.');
@@ -74,10 +77,20 @@ const server=http.createServer(async(req,res)=>{
   // Railway probes this path with its own Host header. It exposes no player data.
   if(url.pathname==='/health'&&req.method==='GET'){db.prepare('SELECT 1').get();json(res,200,{ok:true});return}
   if(req.headers.host!==new URL(publicOrigin).host)throw fail(403,'Invalid host.');
+  if(url.pathname.startsWith('/api/')){
+   res.setHeader('Vary','Origin');
+   if(req.headers.origin){originCheck(req);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);res.setHeader('Access-Control-Allow-Credentials','true')}
+   if(req.method==='OPTIONS'){
+    originCheck(req);
+    const method=req.headers['access-control-request-method'],headers=String(req.headers['access-control-request-headers']||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
+    if(!['GET','POST'].includes(method)||headers.some(h=>!['content-type','x-csrf-token'].includes(h)))throw fail(403,'Request is not allowed.');
+    res.writeHead(204,{'Access-Control-Allow-Methods':'GET, POST','Access-Control-Allow-Headers':'Content-Type, X-CSRF-Token','Access-Control-Max-Age':'600','Cache-Control':'no-store'});res.end();return;
+   }
+  }
   if(url.pathname==='/api/session'&&req.method==='GET'){const s=session(req);json(res,200,s?{user:{id:s.user_id,username:s.username},csrf:s.csrf,...publicPlayer(s.user_id),serverNow:Date.now()}:{user:null,serverNow:Date.now()});return}
   if(url.pathname==='/api/register'&&req.method==='POST'){await auth(req,res,'register');return}
   if(url.pathname==='/api/login'&&req.method==='POST'){await auth(req,res,'login');return}
-  if(url.pathname==='/api/logout'&&req.method==='POST'){originCheck(req);const s=requireSession(req);db.prepare('UPDATE players SET active=0,updated_at=? WHERE user_id=?').run(Date.now(),s.user_id);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(s.token_hash);json(res,200,{ok:true},{'Set-Cookie':cookie('',0)});return}
+  if(url.pathname==='/api/logout'&&req.method==='POST'){originCheck(req);const s=requireSession(req);db.prepare('UPDATE players SET active=0,updated_at=? WHERE user_id=?').run(Date.now(),s.user_id);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(s.token_hash);json(res,200,{ok:true},{'Set-Cookie':cookie(req,'',0)});return}
   if(url.pathname==='/api/play'&&req.method==='POST'){originCheck(req);const s=requireSession(req);limit('play:'+s.user_id,180,60000);const data=await body(req);play(req,res,data,s);return}
   if(url.pathname==='/api/leaderboard'&&req.method==='GET'){limit('board:'+clientAddress(req),240,60000);leaderboard(req,res,url);return}
   if(url.pathname.startsWith('/api/'))throw fail(404,'Unknown endpoint.');

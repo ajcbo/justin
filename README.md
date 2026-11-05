@@ -2,9 +2,9 @@
 
 A deliberately goofy clicker game starring Justin Tangarorang, with optional accounts and shared leaderboards.
 
-[Play Justin Clicker with accounts and leaderboards](https://justin-production.up.railway.app/)
+[Play Justin Clicker](https://ajcbo.github.io/justin/)
 
-The [original GitHub Pages link](https://ajcbo.github.io/justin/) forwards to the live game. To reopen the separate guest save from the old origin, use [legacy guest mode](https://ajcbo.github.io/justin/?guest=1).
+GitHub Pages is the main game address. Accounts, ranked saves and shared leaderboards use the existing Railway server in the background. Guest saves remain in the GitHub browser origin. Existing account usernames, passwords and ranked progress are unchanged; sign in again from the GitHub address.
 
 ## Play
 
@@ -26,6 +26,7 @@ Open `http://127.0.0.1:8765/`. The server serves `dist/` and the account API tog
 node test-clicker.cjs
 node test-online.mjs
 node test-railway.mjs
+node test-cross-origin.mjs
 ```
 
 ## Railway deployment
@@ -34,4 +35,4 @@ Connect this repository with root directory `/`; the root Dockerfile configures 
 
 The private SQLite database is never part of GitHub or the Docker build. Use one server replica with its volume. See [server documentation](server/README.md) for security, storage and game rules.
 
-GitHub Pages forwards the main share link and can run the legacy static guest game only; shared accounts require the Railway server. Prop image sources are in [image credits](image-credits.html).
+GitHub Pages serves the game files; its `justin-api-origin` meta tag points to Railway for shared accounts. The API permits only the configured game origins and uses HttpOnly, Secure, partitioned cookies for the GitHub session, plus per-session CSRF protection. Current browsers support these cookies even with ordinary third-party cookies blocked. Session tokens and passwords are never saved to JavaScript storage. Prop image sources are in [image credits](image-credits.html).

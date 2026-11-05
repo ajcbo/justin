@@ -38,6 +38,7 @@ node test-admin.mjs
 node test-events.mjs
 node test-access.mjs
 node test-media.mjs
+node test-stream.mjs
 ```
 
 ## Railway deployment

@@ -16,7 +16,7 @@ Click effects include comic bonks, confetti, rubber panic and afterimages, plus 
 
 On iPhone/iPad, an animated image layer backs up the canvas face; it is also available as “simple face display (iPhone fix)” in Settings. Character colour treatments are prepared in small sprites instead of depending on canvas filters. Prop processing and canvas resolution are bounded to reduce mobile memory use.
 
-Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. The existing jacob account has a protected owner panel inside the main game for points, characters and upgrade gifts. Season resets retain accounts and archive progress for recovery. Password recovery and live admin events are not included. Thirteen gear and passive upgrades accompany slower character progression. The owner can give points to one player or all existing accounts, reclaim up to the gifted amount from current wallets, and start 1–1,440 minute multipliers for one account or everyone. Boosts affect clicks and passive earnings only during their time window, automatically expire, can be ended early, and do not stack; the strongest wins. Global boosts include accounts created during the event. Guest saves are independent of server events. PPS rankings use permanent base production so event expiry cannot leave inflated rankings.
+Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. The existing jacob account has a protected owner panel inside the main game for points, characters and upgrade gifts. Season resets retain accounts and archive progress for recovery. Password recovery is not included. Thirteen gear and passive upgrades accompany slower character progression. The owner can give points to one player or all existing accounts, reclaim up to the gifted amount from current wallets, and start 1–1,440 minute multipliers for one account or everyone. Boosts affect clicks and passive earnings only during their time window, automatically expire, can be ended early, and do not stack; the strongest wins. Global boosts include accounts created during the event. Guest saves are independent of server events. PPS rankings use permanent base production so event expiry cannot leave inflated rankings. The owner can grant/revoke admin panel access. Delegated admins can give/remove game items, run events and assign cosmetic player titles; only the immutable jacob owner can manage access or reset/restore the whole game. Titles and access roles appear on leaderboards; titles never grant permissions.
 
 ## Online server
 
@@ -36,6 +36,7 @@ node test-cross-origin.mjs
 node test-growth.mjs
 node test-admin.mjs
 node test-events.mjs
+node test-access.mjs
 ```
 
 ## Railway deployment

@@ -30,7 +30,7 @@ function sessionName(req){return cookieName+(crossSite(req)?'_partitioned':'')}
 const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data))};
 const fail=(status,message)=>Object.assign(Error(message),{status});
 const maintenance=process.env.MAINTENANCE==='1',admin=createAdministration(db,G,fail);
-const publicUser=(id,username)=>({id,username,isAdmin:admin.isAdmin(id)});
+const publicUser=(id,username)=>({id,username,isAdmin:admin.isAdmin(id),isOwner:admin.isOwner(id),role:admin.publicRole(id),title:admin.title(id)});
 const buckets=new Map();
 // Railway's public HTTP edge replaces X-Real-IP with the client's address.
 // Do not add a TCP proxy or untrusted services to this single-service deployment.
@@ -73,11 +73,11 @@ function play(req,res,data,s){
   else if(action.kind==='equip'){if(state.owned.includes(action.id))state.equipped=action.id;else rejected++}
   else throw fail(400,'Unknown game action.');
  }
- G.award(state,best);const result={epoch:admin.epoch(),state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
+ G.award(state,best);const result={user:publicUser(s.user_id,s.username),epoch:admin.epoch(),state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
  db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE players SET state=?,combo=?,lifetime=?,pps=?,goat=?,best_combo=?,updated_at=?,active=?,budget=?,budget_at=?,last_click=? WHERE user_id=?').run(JSON.stringify(state),JSON.stringify(combo),state.lifetime,G.basePerSecond(state),G.goatScore(state,best),best,now,data.active===true?1:0,budget,now,lastClick,s.user_id);db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(s.user_id,data.requestId,JSON.stringify(result),now);db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}json(res,200,result);
 }
 const boardStatements=new Map();
-function leaderboard(req,res,url){const metric=url.searchParams.get('metric')||'lifetime',column={lifetime:'lifetime',pps:'pps',goat:'goat'}[metric];if(!column)throw fail(400,'Unknown leaderboard.');const query=`SELECT RANK() OVER(ORDER BY p.${column} DESC) AS rank,u.id,u.username,p.lifetime,p.pps,p.goat,p.best_combo,p.state FROM players p JOIN users u ON u.id=p.user_id ORDER BY p.${column} DESC,u.username_key ASC`;if(!boardStatements.has(metric))boardStatements.set(metric,db.prepare(query));const rows=boardStatements.get(metric).all().map(r=>({id:r.id,rank:r.rank,username:r.username,lifetime:r.lifetime,pps:r.pps,goat:r.goat,bestCombo:r.best_combo,faces:JSON.parse(r.state).owned.length}));const s=session(req);json(res,200,{metric,rows:rows.slice(0,100),total:rows.length,me:s?rows.find(r=>r.id===s.user_id):null,serverNow:Date.now()})}
+function leaderboard(req,res,url){const metric=url.searchParams.get('metric')||'lifetime',column={lifetime:'lifetime',pps:'pps',goat:'goat'}[metric];if(!column)throw fail(400,'Unknown leaderboard.');const query=`SELECT RANK() OVER(ORDER BY p.${column} DESC) AS rank,u.id,u.username,p.lifetime,p.pps,p.goat,p.best_combo,p.state FROM players p JOIN users u ON u.id=p.user_id ORDER BY p.${column} DESC,u.username_key ASC`;if(!boardStatements.has(metric))boardStatements.set(metric,db.prepare(query));const rows=boardStatements.get(metric).all().map(r=>({id:r.id,rank:r.rank,username:r.username,role:admin.publicRole(r.id),title:admin.title(r.id),lifetime:r.lifetime,pps:r.pps,goat:r.goat,bestCombo:r.best_combo,faces:JSON.parse(r.state).owned.length}));const s=session(req);json(res,200,{metric,rows:rows.slice(0,100),total:rows.length,me:s?rows.find(r=>r.id===s.user_id):null,serverNow:Date.now()})}
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.mp3':'audio/mpeg','.wav':'audio/wav','.svg':'image/svg+xml'};
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');
@@ -102,7 +102,7 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname==='/api/play'&&req.method==='POST'){if(maintenance)throw fail(503,'Justin is under maintenance. Please check back soon.');originCheck(req);const s=requireSession(req);limit('play:'+s.user_id,180,60000);const data=await body(req);play(req,res,data,s);return}
   if(url.pathname==='/api/leaderboard'&&req.method==='GET'){limit('board:'+clientAddress(req),240,60000);leaderboard(req,res,url);return}
   if(url.pathname==='/api/admin'&&req.method==='GET'){const s=session(req);if(!s)throw fail(401,'Please log in.');json(res,200,{...admin.overview(s.user_id),maintenance});return}
-  if(['/api/admin/grant','/api/admin/reset','/api/admin/restore','/api/admin/event','/api/admin/revoke'].includes(url.pathname)&&req.method==='POST'){originCheck(req);const s=requireSession(req);if(!admin.isAdmin(s.user_id))throw fail(403,'Only the game owner can use this panel.');limit('admin:'+s.user_id,30,60000);const data=await body(req),kind=url.pathname.split('/').pop();json(res,200,admin[kind](s.user_id,data));return}
+  if(['/api/admin/grant','/api/admin/reset','/api/admin/restore','/api/admin/event','/api/admin/revoke','/api/admin/take','/api/admin/access','/api/admin/rank'].includes(url.pathname)&&req.method==='POST'){originCheck(req);const s=requireSession(req);if(!admin.isAdmin(s.user_id))throw fail(403,'Your account does not have admin panel access.');limit('admin:'+s.user_id,30,60000);const data=await body(req),kind=url.pathname.split('/').pop();json(res,200,admin[kind](s.user_id,data));return}
   if(url.pathname.startsWith('/api/'))throw fail(404,'Unknown endpoint.');
   if(!['GET','HEAD'].includes(req.method))throw fail(405,'Method not allowed.');
   const pathname=decodeURIComponent(url.pathname),filename=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!filename.startsWith(root+path.sep)||!fs.existsSync(filename)||!fs.statSync(filename).isFile())throw fail(404,'Not found.');res.writeHead(200,{'Content-Type':mime[path.extname(filename)]||'application/octet-stream','Cache-Control':'no-cache'});if(req.method==='HEAD')res.end();else fs.createReadStream(filename).pipe(res);

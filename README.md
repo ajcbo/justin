@@ -1,24 +1,34 @@
 # Justin Clicker
 
-A deliberately goofy clicker game starring Justin Tangarorang.
+A deliberately goofy clicker game starring Justin Tangarorang, with optional accounts and shared leaderboards.
 
-[Play Justin Clicker](https://ajcbo.github.io/justin/)
+[GitHub Pages guest game](https://ajcbo.github.io/justin/)
 
-- Click or tap Justin to earn points and change his dance. Space also clicks; arrow keys change dances.
-- Justin keeps dancing and cycling animations without music. Background music supplies its own beat timing when playing; otherwise a silent rhythm drives the animation.
-- Unlock seven face versions. Face bonuses stack permanently; wear any unlocked face and keep every bonus.
-- Buy stronger clicking fingers and passive generators in Bad investments.
-- Click less than 0.65 seconds apart to build a combo. The voice gets higher with every hit, up to two octaves higher, while rings, glow and callouts escalate.
-- Pausing resets the combo and voice pitch. Your best streak and game progress save in this browser.
-- The supplied video audio is trimmed and boosted by 5 dB. The MP3 is in `assets/justin-click.mp3`; pre-decoded WAV playback makes presses responsive without MP3 encoder delay. Rapid clicks restart one voice instead of stacking audio.
-- Older toys and background music are under Extra nonsense. Sound volume, mute and reduced motion are supported.
+## Play
 
-## Apple Music mode
+Click Justin to earn points and change his dance. Click quickly for a combo and an increasingly high voice. Unlock face versions and buy passive upgrades. Justin keeps dancing even without music. Apple Music remains an optional mode.
 
-The Apple Music visualizer is an optional mode linked from the main game. It uses Apple's official player, album artwork backgrounds, editable characters, and lyric search/import. Its lyric clock and ambient tempo are manual and separate from Apple playback. For a new song within an album or playlist, add that song link to update artwork and lyrics. Full playback requires signing in inside Apple's player.
+Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. Password recovery, admin events and an admin panel are not included yet.
 
-## Run or host
+## Online server
 
-This is a static website with no build step or API key. Serve this directory with any static server; GitHub Pages serves `index.html`. Photo and music replacements stay in the visitor's tab. Game saves remain in that browser, and passive points accrue while the tab is active.
+Node.js 24 or later; no package installation required:
 
-Image-prop sources are listed in [image credits](image-credits.html). No AI prompt editor or paid AI service is included.
+```sh
+node server/server.mjs
+```
+
+Open `http://127.0.0.1:8765/`. The server serves `dist/` and the account API together. Tests:
+
+```sh
+node test-clicker.cjs
+node test-online.mjs
+```
+
+## Railway deployment
+
+Connect this repository with root directory `/`; the root Dockerfile and `railway.toml` configure the build, one replica and `/health` checks. Attach a persistent volume at `/data` before starting. `JUSTIN_DB=/data/game.sqlite` and `HOST=0.0.0.0` are set in the image. Generate a public Railway domain targeting port `8080`. Its `RAILWAY_PUBLIC_DOMAIN` sets the HTTPS origin automatically; for a custom domain set `PUBLIC_ORIGIN=https://your-domain` explicitly. Redeploy after attaching the volume and generating the domain. The server refuses Railway startup without persistent storage, or public startup without an HTTPS origin.
+
+The private SQLite database is never part of GitHub or the Docker build. Use one server replica with its volume. See [server documentation](server/README.md) for security, storage and game rules.
+
+GitHub Pages runs the root static guest game only; shared accounts require the Railway server. Prop image sources are in [image credits](image-credits.html).

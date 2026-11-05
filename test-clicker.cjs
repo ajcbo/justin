@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict');
+const G=require('./dist/clicker-core.js');
+const s=G.fresh();
+assert.equal(G.buySkin(s,'pixel'),false);
+for(let i=0;i<25;i++)G.click(s);
+assert.equal(s.bank,25);assert.equal(s.clicks,25);
+assert.equal(G.buySkin(s,'pixel'),true);assert.equal(s.bank,0);assert.equal(G.perClick(s),2);
+assert.equal(G.buySkin(s,'pixel'),false);assert.equal(s.owned.length,2);
+s.equipped='normal';assert.equal(G.perClick(s),2,'Cosmetic choice must keep earned click power');
+G.earn(s,50);assert.equal(G.buyBusiness(s,'chat'),true);assert.equal(G.perSecond(s),1);assert.equal(s.bank,0);
+assert.equal(G.price(s,G.businesses.find(b=>b.id==='chat')),65);
+G.earn(s,G.perSecond(s)*3.5);assert.equal(s.bank,3.5);
+const saved=G.clean(JSON.parse(JSON.stringify(s)));assert.equal(saved.equipped,'normal');assert.equal(G.perSecond(saved),1);assert.equal(G.perClick(saved),2);
+assert.equal(G.buyBusiness(s,'unknown'),false);assert.equal(G.buySkin(s,'unknown'),false);
+const corrupted=G.clean({version:1,bank:-20,lifetime:Infinity,owned:123,equipped:'missing',levels:{finger:-8,chat:1.9,intern:10000}});
+assert.equal(corrupted.bank,0);assert.equal(corrupted.equipped,'normal');assert.equal(corrupted.levels.chat,1);assert.equal(corrupted.levels.intern,100);
+console.log('Click rewards, face unlocks, cumulative boosts, upgrade prices, passive earnings and save recovery passed.');
+let combo=null,previousRate=0;
+for(let i=0;i<50;i++){combo=G.comboHit(combo,i*100);assert.equal(combo.count,i+1);assert.ok(combo.rate>=previousRate);assert.ok(combo.rate<=4);previousRate=combo.rate}
+assert.equal(combo.tier,4);assert.equal(combo.rate,4);
+combo=G.comboHit(combo,combo.at+G.comboWindow+1);assert.equal(combo.count,1);assert.equal(combo.rate,1);assert.equal(combo.tier,0);
+combo=G.comboHit(combo,combo.at+G.comboWindow);assert.equal(combo.count,2);
+assert.equal(G.comboHit({count:9999,at:0},100).count,9999);
+console.log('Fast-click combo, rising pitch, pitch ceiling, expiry and boundary timing passed.');

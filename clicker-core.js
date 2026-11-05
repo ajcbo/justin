@@ -26,5 +26,6 @@
  function buyBusiness(s,id){const b=businesses.find(x=>x.id===id);if(!b||s.levels[id]>=100)return false;const cost=price(s,b);if(s.bank<cost)return false;s.bank-=cost;s.levels[id]++;return true}
  const comboWindow=650;
  function comboHit(previous,now){const count=previous&&now>=previous.at&&now-previous.at<=comboWindow?Math.min(previous.count+1,9999):1;return {count,at:now,rate:Math.pow(2,Math.min(24,(count-1)*.6)/12),tier:count>=40?4:count>=25?3:count>=12?2:count>=5?1:0}}
- const api={skins,businesses,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+ const goatScore=(s,bestCombo=0)=>Math.floor(100*(4*Math.log10(s.lifetime+1)+3*Math.log10(perSecond(s)+1)+2*Math.log10(s.clicks+1)+2*(s.owned.length-1)+Math.log10(bestCombo+1)));
+ const api={skins,businesses,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

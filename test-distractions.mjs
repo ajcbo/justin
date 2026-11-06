@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {spawn} from 'node:child_process';
+import {DatabaseSync} from 'node:sqlite';
+import {mkdtemp,rm} from 'node:fs/promises';
+import os from 'node:os';import path from 'node:path';
+const G=createRequire(import.meta.url)('./dist/progression-core.js'),P=G.Progression;
+const s=G.fresh();assert.equal(s.toys.length,0);assert.equal(P.buyToy(s,'dvd'),false);s.bank=1500;assert.equal(P.buyToy(s,'dvd'),true);assert.equal(s.bank,0);assert.equal(P.buyToy(s,'dvd'),false);assert.equal(P.buyToy(s,'fake'),false);assert.deepEqual(G.clean(s).toys,['dvd']);s.runPoints=1e6;assert.equal(P.rebirth(s,0),true);assert.deepEqual(s.toys,['dvd']);assert.equal(G.basePerClick(s),1.5);
+for(const id of ['prism','reactor','orbital','rift','time']){assert.equal(s.levels[id],0);s.bank=G.price(s,G.businesses.find(b=>b.id===id));assert.equal(G.buyBusiness(s,id),true);assert.equal(s.levels[id],1)}
+const directory=await mkdtemp(path.join(os.tmpdir(),'justin-toy-test-')),file=path.join(directory,'test.sqlite');let db;const origin='http://127.0.0.1:8793',server=spawn(process.execPath,['server/server.mjs'],{cwd:new URL('.',import.meta.url),env:{...process.env,PORT:'8793',PUBLIC_ORIGIN:origin,JUSTIN_DB:file},stdio:['ignore','pipe','pipe'],windowsHide:true});let cookie='',csrf='';
+async function call(route,body){const r=await fetch(origin+route,{method:body?'POST':'GET',headers:{Origin:origin,...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{})},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();if(r.headers.has('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];if(d.csrf)csrf=d.csrf;assert.equal(r.status,200,JSON.stringify(d));return d}
+try{await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Startup timed out')),15000);server.stdout.on('data',c=>{if(String(c).includes('Justin accounts')){clearTimeout(timer);resolve()}});server.once('error',reject)});const account=await call('/api/register',{username:'Toy_Test',password:'Local-distractions-only!'});db=new DatabaseSync(file);const seeded=G.fresh();seeded.bank=100000;db.prepare('UPDATE players SET state=? WHERE user_id=?').run(JSON.stringify(seeded),account.user.id);
+const body={requestId:'toy-test-buy0001',actions:[{kind:'toy',id:'dvd',cost:0,owned:true}],active:true};const bought=await call('/api/play',body);assert.equal(bought.state.bank,98500);assert.deepEqual(bought.state.toys,['dvd']);assert.deepEqual(await call('/api/play',body),bought);
+const repeated=await call('/api/play',{requestId:'toy-test-buy0002',actions:[{kind:'toy',id:'dvd'},{kind:'toy',id:'orbit'},{kind:'toy',id:'invented'}]});assert.equal(repeated.rejected,3);assert.equal(repeated.state.bank,98500);assert.deepEqual((await call('/api/session')).state.toys,['dvd']);
+console.log('Five mid/endgame upgrades, ten distraction unlocks, server prices, permanent ownership, rebirth retention, invalid/duplicate claims and retry safety passed.');
+}finally{db?.close();if(server.exitCode===null)await new Promise(resolve=>{server.once('exit',resolve);server.kill('SIGTERM')});if(!path.resolve(directory).startsWith(path.resolve(os.tmpdir())+path.sep+'justin-toy-test-'))throw Error('Unexpected cleanup directory');await rm(directory,{recursive:true,force:true})}

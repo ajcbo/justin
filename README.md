@@ -1,50 +1,42 @@
 # Justin Clicker
 
-A deliberately goofy clicker game starring Justin Tangarorang, with optional accounts and shared leaderboards.
+Main address: https://ajcbo.github.io/justin/
 
-[Play Justin Clicker](https://ajcbo.github.io/justin/)
+## Earnings
 
-GitHub Pages is the main game address. Accounts, ranked saves and shared leaderboards use the existing Railway server in the background. Guest saves remain in the GitHub browser origin. Existing account usernames and passwords are unchanged; game progress starts fresh for season 2; sign in again from the GitHub address.
+Justins add permanent click power. Owning multiple Justins adds their bonuses, independent of the worn face. Upgrade quantities never multiply. Gold, Golden, Platinum, Diamond and Rainbow cannot be purchased. Gold comes from boxes/daily gifts, Golden from 5,000-click rolls, and gem variants from rolls and gift guarantees.
 
-## Play
+Rebirths supply the permanent earnings multiplier: 1 + 0.5 per rebirth. First requirement: 1 million points earned in the run; each next requirement is five times higher. Thirteen milestones are supported. Rebirth resets wallet, gear levels, purchased Justins and run earnings. Roll-only Justins, backdrops, lifetime stats, achievements, claim history and roll history remain. It requires eligibility and an explicit confirmation; replayed requests cannot reset twice. Admin wallet gifts do not count as run earnings.
 
-Click Justin to earn points and change his dance. The voice stays normal for the first 10 hits and gradually reaches its two-octave ceiling at 210 hits. Collect 18 Justins, including Miles Morales, a screaming Hamster Justin using his own face/skin colour, eight supplied photo variants and a rare Golden Justin. Golden Justin has a 10% chance at each 5,000-click milestone, with no rolls in between and cannot be bought; its +250 click boost is permanent. The earlier 24-karat skin remains a normal purchase.
+Rewards scale from permanent click power (two clicks/sec reference) plus passive income. Timed admin multipliers do not inflate rewards. Daily gifts use 60 seconds of this rate, challenges 250/400/350 seconds, free milestone rolls 60 seconds, and catches 15 seconds. Box point refunds scale to ten seconds, capped at half the 25,000-point price to prevent profitable refund loops. Rewards are calculated before granting the rolled character. Daily gift receipts are separate from challenge receipts.
 
-Earn passive income at full speed while active and 25% while away, capped at 24 hours per return. The displayed daily offline estimate is PPS × 21,600. Ranked offline time and rare rolls are calculated by the server. Offline receipts appear after absences of at least 30 seconds; smaller gaps still accrue the reduced income. Sixteen permanent achievements track clicks, combos, income, collection and lucky discoveries.
+## Rolls and activities
 
-Click effects include comic bonks, confetti, rubber panic and afterimages, plus launch/photocopier toys. Reduced-motion settings suppress extra effects. Justin keeps dancing without music. Apple Music remains an optional mode.
+Daily: Rainbow 2%, Diamond 8%, Platinum 20%, Gold 10%, points 60%. Guarantee milestones for Platinum/Diamond/Rainbow: gift 7/30/90. Five visits in a seven-day track earn a bonus; missing days does not erase lifetime progress.
 
-On iPhone/iPad, an animated image layer backs up the canvas face; it is also available as “simple face display (iPhone fix)” in Settings. Character colour treatments are prepared in small sprites instead of depending on canvas filters. Prop processing and canvas resolution are bounded to reduce mobile memory use.
+Mystery boxes: 25,000 points, three per day. Rainbow 5%, Diamond 15%, Platinum 40%, Gold 10%, points 30%. Free 5,000 full-value click rolls: Golden 20%, Diamond 15%, Platinum 35%, points 30%. Duplicates give points. Server-saved results are queued for rolling cutscenes, with reduced-motion skipping. No client roll or prize fields are trusted.
 
-Guests keep playing their separate browser save. Signing up creates a fresh ranked save with lifetime points, points per second and GOAT rankings. The existing jacob account has a protected owner panel inside the main game for points, characters and upgrade gifts. Season resets retain accounts and archive progress for recovery. Password recovery is not included. Thirteen gear and passive upgrades accompany slower character progression. The owner can give points to one player or all existing accounts, reclaim up to the gifted amount from current wallets, and start 1–1,440 minute multipliers for one account or everyone. Boosts affect clicks and passive earnings only during their time window, automatically expire, can be ended early, and do not stack; the strongest wins. Global boosts include accounts created during the event. Guest saves are independent of server events. PPS rankings use permanent base production so event expiry cannot leave inflated rankings. The owner can grant/revoke admin panel access. Delegated admins can give/remove game items, run events and assign cosmetic player titles; only the immutable jacob owner can manage access or reset/restore the whole game. Titles and access roles appear on leaderboards; titles never grant permissions.
+Click targets appear about every ten seconds for five seconds, awarding 20 clicks worth of points (50 on every fifth). Six full-value clicks/sec, 10% rewards above that, and a ranked transport limiter reduce automation advantage. Spacebar clicking is disabled. Harder daily goals rotate between 500–1,000 clicks, 20–30 targets and 10–15 upgrades. Collection milestones, hourly catch events and shared milestones add other rewards.
 
-## Online server
+## Interface and hosting
 
-Node.js 24 or later; no package installation required:
+White backdrop by default, handwritten font, hand-drawn SVG icons, upgrade-first shop and prominent whole-site Backdrops. Photo faces retain their original appearance, with cached masks and an iPhone image fallback. Twenty-five Justins include the new chair, stairs and purple photos. Gem/gold textures, rainbow blending, rare sheen, reel reveals and rebirth animation supply feedback. Apple Music mode is paused. No token shop, weekly themed collection or showcase.
 
-```sh
-node server/server.mjs
-```
+GitHub Pages serves the frontend; Railway provides shared username/password accounts, server-checked rankings and private SQLite storage. Persistent volume `/data`, one replica, Node 24, no dependency installation. Session cookies roll for 30 days; a first-party Railway account mode handles blocked cross-site cookies. Private databases/credentials are excluded from release packages.
 
-Open `http://127.0.0.1:8765/`. The server serves `dist/` and the account API together. Tests:
+The protected jacob account manages delegated admins, gifts/removals, titles, timed boosts, sound mutes, second-based announcements and recoverable season resets. Local guest saves stay separate. Rebirths are personal; this update never resets all players or auto-rebirths anyone.
 
-```sh
-node test-clicker.cjs
-node test-online.mjs
-node test-railway.mjs
-node test-cross-origin.mjs
-node test-growth.mjs
-node test-admin.mjs
-node test-events.mjs
-node test-access.mjs
-node test-media.mjs
-node test-stream.mjs
-```
+Validation: fifteen suites covering rules, timing, accounts, offline earnings, gifts/rolls, rebirth resets and preservation, replay safety, admin permissions, storage persistence and live events. Run test-clicker.cjs and all test-*.mjs files individually with Node. Browser preview checked the rebirth confirmation/eligibility screen and console errors. Roll cutscenes and keyboard input were checked in the preceding build; new result effects respect reduced motion.
 
-## Railway deployment
 
-Connect this repository with root directory `/`; the root Dockerfile configures the build. In Railway's dashboard set the healthcheck to `/health` and keep one replica. Attach a persistent volume at `/data` before starting. `JUSTIN_DB=/data/game.sqlite` and `HOST=0.0.0.0` are set in the image. Generate a public Railway domain targeting port `8080`. Its `RAILWAY_PUBLIC_DOMAIN` sets the HTTPS origin automatically; for a custom domain set `PUBLIC_ORIGIN=https://your-domain` explicitly. Redeploy after attaching the volume and generating the domain. The server refuses Railway startup without persistent storage, or public startup without an HTTPS origin. The included `railway.toml` is legacy configuration; new Railway services require the dashboard settings instead.
+## Mid/endgame and ambient distractions
 
-The private SQLite database is never part of GitHub or the Docker build. Use one server replica with its volume. See [server documentation](server/README.md) for security, storage and game rules.
+Five additional gear tiers: Prismatic gaming mouse (+500/click, 8M base), Justin reactor (+3,000/sec, 25M), Orbital studio (+12,000/sec, 250M), Reality server (+50,000/sec, 2.5B), Time machine (+200,000/sec, 25B). Existing cost growth/level caps and rebirth rules apply. Late-tier shop cards and rare characters have a subtle procedural glint; no Minecraft texture is copied.
 
-GitHub Pages serves the game files; its `justin-api-origin` meta tag points to Railway for shared accounts. The API permits only the configured game origins and uses HttpOnly, Secure, partitioned cookies for the GitHub session, plus per-session CSRF protection. Current browsers support these cookies even with ordinary third-party cookies blocked. Session tokens and passwords are never saved to JavaScript storage. Sessions renew for 30 days of inactivity, stale-tab CSRF tokens recover, and login verifies cookie persistence. Browsers that cannot keep the cross-site cookie get a first-party account-mode link to the same public Railway game. The backdrop picker contains 27 supplied Drive images organized by collection, with cosmetic prices from 1,500 to 2,000,000 points, plus the original free white background. The full-site animated Justin Dimension can only be gifted by an admin. Backdrops save with the account or separate guest save. Settings includes a local custom click-sound waveform crop editor (5 MB / 30 seconds) saved in IndexedDB. Admin panels can silence account sounds and post timed announcements for everyone or one account. Prop image sources are in [image credits](image-credits.html).
+Ten permanent cosmetic distractions are purchased with points in the Distractions shop category. DVD Justin 1,500; Tiny runner 5,000; Side-eye peek 8,000; Marble race 15,000; Spinning Justin 25,000; Aquarium 50,000; Cursors 100,000; Download simulator 150,000; Portal 500,000; Solar system 2M. They float at full opacity with no background around the click area without frames or input interception. They add no earning power and survive rebirth. Visibility is saved on the device. Master pause, reduced motion, background-tab suspension, offscreen culling, capped canvas resolution and a shared 20fps clock limit rendering work. Inspiration: https://neal.fun/stimulation-clicker/ ; all visual implementations are original native canvas/CSS using supplied Justin photos.
+
+## GUI sounds
+
+Separate on/off, meme opt-out, volume and test controls in Settings. Local synthesized clicks/purchase chimes and four short downloaded Myinstants clips cover achievements (Anime Wow), announcements (Metal Gear alert), duplicate rolls (Bruh), and catches/distraction unlocks (duck). Samples are fetched from the local game assets after a gesture; players do not contact Myinstants during gameplay. Clips are capped to 2.2 seconds, volume-limited and throttled. Admin muting stops current voices and prevents new ones. Existing custom click sounds/music remain separate. Full source pages and upload attribution are in sound-credits.html and assets/gui-sfx/sources.json. No redistribution license is inferred from an upload listing.
+
+Tests include test-distractions.mjs (server-validated unlocks/prices, rebirth retention, forged/duplicate requests) and test-gui-audio.cjs (gesture unlock, decoded clips, throttling, separate preferences, hidden-tab silence and admin muting). Local QA used a separate localhost account/database; real preview progression was not seeded or reset. Browser checked background-free effects inside the playfield, click-through, sound settings, store tabs and an empty console error log. A stale reconnect status was also corrected after successful synchronization.

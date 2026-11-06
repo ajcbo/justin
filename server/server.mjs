@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import {isIP} from 'node:net';
-const require=createRequire(import.meta.url),G=require('../dist/clicker-core.js'),derive=promisify(scrypt);
+const require=createRequire(import.meta.url),G=require('../dist/progression-core.js'),derive=promisify(scrypt);
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const dbPath=process.env.JUSTIN_DB||path.join(path.dirname(fileURLToPath(import.meta.url)),'data/game.sqlite');
 if(process.env.RAILWAY_ENVIRONMENT_ID){
@@ -30,6 +30,10 @@ function sessionName(req){return cookieName+(crossSite(req)?'_partitioned':'')}
 const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data))};
 const fail=(status,message)=>Object.assign(Error(message),{status});
 const maintenance=process.env.MAINTENANCE==='1',admin=createAdministration(db,G,fail);
+db.exec('CREATE TABLE IF NOT EXISTS community_progress(epoch INTEGER PRIMARY KEY,total INTEGER NOT NULL DEFAULT 0)');
+function communityTotal(){const epoch=admin.epoch(),existing=db.prepare('SELECT total FROM community_progress WHERE epoch=?').get(epoch);if(existing)return existing.total;db.prepare("INSERT OR IGNORE INTO community_progress(epoch,total) SELECT ?,COALESCE(SUM(CAST(json_extract(state,'$.clicks') AS INTEGER)),0) FROM players").run(epoch);return db.prepare('SELECT total FROM community_progress WHERE epoch=?').get(epoch).total}
+// Refresh permanent production indexes under the current multiplier rules. Inventory stays unchanged.
+for(const row of db.prepare('SELECT user_id,state,best_combo FROM players').all()){const state=G.clean(JSON.parse(row.state));db.prepare('UPDATE players SET pps=?,goat=? WHERE user_id=?').run(G.basePerSecond(state),G.goatScore(state,row.best_combo),row.user_id)}
 const publicUser=(id,username)=>({id,username,isAdmin:admin.isAdmin(id),isOwner:admin.isOwner(id),role:admin.publicRole(id),title:admin.title(id)});
 const buckets=new Map();
 // Railway's public HTTP edge replaces X-Real-IP with the client's address.
@@ -44,7 +48,7 @@ function issue(req,userId){const token=randomBytes(32).toString('hex'),csrf=rand
 function player(userId){return db.prepare('SELECT * FROM players WHERE user_id=?').get(userId)}
 function publicPlayer(userId){const row=player(userId),state=G.clean(JSON.parse(row.state)),now=Date.now(),elapsed=Math.max(0,(now-row.updated_at)/1000);let offlineEarned=0;state.boosts=admin.boosts(userId,now);
  if(!maintenance&&(!row.active||elapsed>5.5)){offlineEarned=G.accrueOffline(state,elapsed,now);state.savedAt=now;G.award(state,row.best_combo);db.prepare('UPDATE players SET state=?,lifetime=?,goat=?,updated_at=?,active=0 WHERE user_id=?').run(JSON.stringify(state),state.lifetime,G.goatScore(state,row.best_combo),now,userId)}
- return {state,bestCombo:row.best_combo,offlineEarned:elapsed>=30?offlineEarned:0}}
+ G.Progression.prepare(state,now);G.scheduleCritical(state,now,()=>randomBytes(12).toString('hex'));db.prepare('UPDATE players SET state=? WHERE user_id=?').run(JSON.stringify(state),userId);return {state,bestCombo:row.best_combo,offlineEarned:elapsed>=30?offlineEarned:0}}
 function requireSession(req){const s=session(req);if(!s)throw fail(401,'Please log in again.');if(req.headers['x-csrf-token']!==s.csrf)throw fail(403,'Session check failed. Refresh and try again.');return s}
 function originCheck(req){if(req.headers.origin!==publicOrigin&&!frontendOrigins.has(req.headers.origin))throw fail(403,'This request must come from the game website.');}
 async function auth(req,res,mode){if(maintenance&&mode==='register')throw fail(503,'Justin is under maintenance. Please check back soon.');originCheck(req);limit('auth:'+clientAddress(req),20,600000);const data=await body(req),username=typeof data.username==='string'?data.username.trim():'',password=typeof data.password==='string'?data.password:'';
@@ -65,18 +69,26 @@ function play(req,res,data,s){
  if((data.epoch??1)!==admin.epoch()){json(res,409,{error:'The game has started a new season. Your progress has been refreshed.',code:'SEASON_CHANGED',user:publicUser(s.user_id,s.username),csrf:s.csrf,epoch:admin.epoch(),...publicPlayer(s.user_id),live:admin.live(s.user_id),serverNow:Date.now()});return}
  const prior=db.prepare('SELECT response FROM receipts WHERE user_id=? AND request_id=?').get(s.user_id,data.requestId);if(prior){json(res,200,JSON.parse(prior.response));return}
  const now=Date.now(),row=player(s.user_id),state=G.clean(JSON.parse(row.state)),elapsed=(now-row.updated_at)/1000;let best=row.best_combo,combo=row.combo?JSON.parse(row.combo):null,budget=Math.min(25,row.budget+(now-row.budget_at)*.02),lastClick=row.last_click,rejected=0;
- state.boosts=admin.boosts(s.user_id,now);let offlineEarned=0;if(row.active&&elapsed>=0&&elapsed<=5.5)G.earn(state,G.passiveAmount(state,row.updated_at,now));else offlineEarned=G.accrueOffline(state,elapsed,now);
+ const startingClicks=state.clicks,communityBefore=communityTotal();G.Progression.prepare(state,now);state.boosts=admin.boosts(s.user_id,now);let offlineEarned=0;if(row.active&&elapsed>=0&&elapsed<=5.5)G.earn(state,G.passiveAmount(state,row.updated_at,now));else offlineEarned=G.accrueOffline(state,elapsed,now);
  for(const action of data.actions){if(action.kind==='click'){
-   const at=Math.round(Number(action.at));if(!Number.isFinite(at)||at>now+500||at<now-15000||at<=lastClick||budget<1){rejected++;continue}budget--;lastClick=at;G.click(state,at);if(state.clicks%5000===0)G.rollGolden(state,randomInt(10)/10);combo=G.comboHit(combo,at);best=Math.max(best,combo.count);
+   const at=Math.round(Number(action.at));if(!Number.isFinite(at)||at>now+500||at<now-15000||at<=lastClick||budget<1){rejected++;continue}budget--;lastClick=at;const reward=G.rewardClick(state,at,action);if(reward.full&&state.clicks%5000===0)G.Progression.milestoneRoll(state,at,randomInt(1000000)/1000000);combo=G.comboHit(combo,at);best=Math.max(best,combo.count);
   }else if(action.kind==='skin'){if(!G.buySkin(state,action.id))rejected++}
   else if(action.kind==='backdrop'){if(!G.buyBackdrop(state,action.id))rejected++}
   else if(action.kind==='equip-backdrop'){if(state.backdrops.includes(action.id))state.backdrop=action.id;else rejected++}
   else if(action.kind==='business'){if(!G.buyBusiness(state,action.id))rejected++}
   else if(action.kind==='equip'){if(state.owned.includes(action.id))state.equipped=action.id;else rejected++}
+  else if(action.kind==='toy'){if(!G.Progression.buyToy(state,action.id))rejected++}
+  else if(action.kind==='rebirth'){if(action.confirm!=='REBIRTH'||!G.Progression.rebirth(state,Number(action.count)))rejected++;else combo=null}
+  else if(action.kind==='mystery-box'){if(!G.Progression.mysteryBox(state,now,randomInt(1000000)/1000000))rejected++}
+  else if(action.kind==='daily-gift'){if(!G.Progression.gift(state,now,randomInt(1000000)/1000000))rejected++}
+  else if(action.kind==='challenge'){if(!G.Progression.task(state,action.id,now))rejected++}
+  else if(action.kind==='book-reward'){if(!G.Progression.book(state,Number(action.count),now))rejected++}
+  else if(action.kind==='community-reward'){if(!G.Progression.community(state,communityBefore,Number(action.goal),now))rejected++}
+  else if(action.kind==='catch-justin'){if(!G.Progression.catchJustin(state,Number(action.slot),now))rejected++}
   else throw fail(400,'Unknown game action.');
  }
- G.award(state,best);const result={live:admin.live(s.user_id),user:publicUser(s.user_id,s.username),epoch:admin.epoch(),state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
- db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE players SET state=?,combo=?,lifetime=?,pps=?,goat=?,best_combo=?,updated_at=?,active=?,budget=?,budget_at=?,last_click=? WHERE user_id=?').run(JSON.stringify(state),JSON.stringify(combo),state.lifetime,G.basePerSecond(state),G.goatScore(state,best),best,now,data.active===true?1:0,budget,now,lastClick,s.user_id);db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(s.user_id,data.requestId,JSON.stringify(result),now);db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}json(res,200,result);
+ G.Progression.prepare(state,now);G.scheduleCritical(state,now,()=>randomBytes(12).toString('hex'));G.award(state,best);const result={live:admin.live(s.user_id),user:publicUser(s.user_id,s.username),epoch:admin.epoch(),state,bestCombo:best,rejected,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
+ db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE community_progress SET total=total+? WHERE epoch=?').run(state.clicks-startingClicks,admin.epoch());db.prepare('UPDATE players SET state=?,combo=?,lifetime=?,pps=?,goat=?,best_combo=?,updated_at=?,active=?,budget=?,budget_at=?,last_click=? WHERE user_id=?').run(JSON.stringify(state),JSON.stringify(combo),state.lifetime,G.basePerSecond(state),G.goatScore(state,best),best,now,data.active===true?1:0,budget,now,lastClick,s.user_id);db.prepare('INSERT INTO receipts VALUES(?,?,?,?)').run(s.user_id,data.requestId,JSON.stringify(result),now);db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}json(res,200,result);
 }
 const boardStatements=new Map();
 function leaderboard(req,res,url){const metric=url.searchParams.get('metric')||'lifetime',column={lifetime:'lifetime',pps:'pps',goat:'goat'}[metric];if(!column)throw fail(400,'Unknown leaderboard.');const query=`SELECT RANK() OVER(ORDER BY p.${column} DESC) AS rank,u.id,u.username,p.lifetime,p.pps,p.goat,p.best_combo,p.state FROM players p JOIN users u ON u.id=p.user_id ORDER BY p.${column} DESC,u.username_key ASC`;if(!boardStatements.has(metric))boardStatements.set(metric,db.prepare(query));const rows=boardStatements.get(metric).all().map(r=>({id:r.id,rank:r.rank,username:r.username,role:admin.publicRole(r.id),title:admin.title(r.id),lifetime:r.lifetime,pps:r.pps,goat:r.goat,bestCombo:r.best_combo,faces:JSON.parse(r.state).owned.length}));const s=session(req);json(res,200,{metric,rows:rows.slice(0,100),total:rows.length,me:s?rows.find(r=>r.id===s.user_id):null,serverNow:Date.now()})}
@@ -109,6 +121,7 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname==='/api/login'&&req.method==='POST'){await auth(req,res,'login');return}
   if(url.pathname==='/api/logout'&&req.method==='POST'){originCheck(req);const s=requireSession(req);db.prepare('UPDATE players SET active=0,updated_at=? WHERE user_id=?').run(Date.now(),s.user_id);db.prepare('DELETE FROM sessions WHERE token_hash=?').run(s.token_hash);json(res,200,{ok:true},{'Set-Cookie':cookie(req,'',0)});return}
   if(url.pathname==='/api/play'&&req.method==='POST'){if(maintenance)throw fail(503,'Justin is under maintenance. Please check back soon.');originCheck(req);const s=requireSession(req);limit('play:'+s.user_id,180,60000);const data=await body(req);play(req,res,data,s);return}
+  if(url.pathname==='/api/community'&&req.method==='GET'){limit('community:'+clientAddress(req),120,60000);json(res,200,{total:communityTotal(),epoch:admin.epoch(),serverNow:Date.now()});return}
   if(url.pathname==='/api/leaderboard'&&req.method==='GET'){limit('board:'+clientAddress(req),240,60000);leaderboard(req,res,url);return}
   if(url.pathname==='/api/admin'&&req.method==='GET'){const s=session(req);if(!s)throw fail(401,'Please log in.');json(res,200,{...admin.overview(s.user_id),maintenance});return}
   if(['/api/admin/grant','/api/admin/reset','/api/admin/restore','/api/admin/event','/api/admin/revoke','/api/admin/take','/api/admin/access','/api/admin/rank','/api/admin/mute','/api/admin/announce'].includes(url.pathname)&&req.method==='POST'){originCheck(req);const s=requireSession(req);if(!admin.isAdmin(s.user_id))throw fail(403,'Your account does not have admin panel access.');limit('admin:'+s.user_id,30,60000);const data=await body(req),kind=url.pathname.split('/').pop();json(res,200,admin[kind](s.user_id,data));if(['announce','mute'].includes(kind))pushLive();return}

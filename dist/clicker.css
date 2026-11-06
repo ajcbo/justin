@@ -7,3 +7,9 @@ body{padding:0 3% 25px}header{padding:12px 0}header>span{color:#777}.music-mode-
 .upgrade-section{grid-column:1/-1;font-size:12px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #222;padding:16px 0 8px;margin:0}.golden-roll{font-size:11px;color:#766a27;margin:5px 0 12px;line-height:1.4}
 
 .boost-note{font:bold 12px Arial;color:#5e308b;background:#f1e7ff;padding:10px}#stage{contain:layout paint style}#face-dom{will-change:transform}.face-card,.business-card{content-visibility:auto;contain-intrinsic-size:auto 90px}
+
+/* Skill targets stay readable over every backdrop; no continuously-running effect. */
+.fair-play-note{font-size:11px;line-height:1.5;opacity:.75;margin:8px 0}
+.critical-target{position:absolute;z-index:12;transform:translate(-50%,-50%) rotate(-7deg);width:76px;min-height:56px;padding:6px;border:3px solid #171717;border-radius:50%;background:#faff50;color:#171717;font:900 12px/1.1 Arial,sans-serif;box-shadow:3px 4px 0 #171717;cursor:crosshair;touch-action:manipulation}
+.critical-target[hidden]{display:none}.critical-target[data-bonus="10"]{background:#ff94dd;transform:translate(-50%,-50%) rotate(7deg)}
+.critical-target:focus-visible{outline:4px solid #458aff;outline-offset:5px}.click-points.critical-points{font-weight:900;color:#624000;background:#fff85e;padding:4px 8px;border:2px solid #171717}

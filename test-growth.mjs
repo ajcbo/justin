@@ -14,12 +14,12 @@ try{
  const user=await call('/api/register',{username:'Growth_Test',password:'Only-local-growth-test!'});db=new DatabaseSync(dbPath);
  const seed=G.fresh();seed.levels.chat=4;seed.bank=seed.lifetime=50;
  db.prepare('UPDATE players SET state=?,lifetime=?,pps=?,updated_at=?,active=1 WHERE user_id=?').run(JSON.stringify(seed),50,2,Date.now()-2*86400000,user.user.id);
- const first=await call('/api/session');assert.equal(first.offlineEarned,43200);assert.equal(first.state.bank,43250);assert.ok(first.state.badges.includes('offline'));
+ const first=await call('/api/session');assert.equal(first.offlineEarned,86400);assert.equal(first.state.bank,86450);assert.ok(first.state.badges.includes('offline'));
  const second=await call('/api/session');assert.ok(second.state.bank-first.state.bank<.2,'Returning twice must not repeat the offline payout');
- const forged=await call('/api/play',{requestId:'growth-forged',active:true,offlineSeconds:1e12,offlineEarned:1e15,actions:[]});assert.ok(forged.state.bank<43252,'Client cannot submit its own offline reward');
+ const forged=await call('/api/play',{requestId:'growth-forged',active:true,offlineSeconds:1e12,offlineEarned:1e15,actions:[]});assert.ok(forged.state.bank<86452,'Client cannot submit its own offline reward');
  const retry=await call('/api/play',{requestId:'growth-forged',active:true,actions:[]});assert.deepEqual(retry,forged,'Retry must not double-pay offline earnings');
  db.prepare('UPDATE players SET updated_at=?,active=0 WHERE user_id=?').run(Date.now()-3600000,user.user.id);
- const resumed=await call('/api/play',{requestId:'growth-resumed',active:true,actions:[]});assert.ok(resumed.offlineEarned>=1800&&resumed.offlineEarned<1801);
+ const resumed=await call('/api/play',{requestId:'growth-resumed',active:true,actions:[]});assert.ok(resumed.offlineEarned>=3600&&resumed.offlineEarned<3601);
  const board=await call('/api/leaderboard?metric=goat');assert.equal(board.me.goat,G.goatScore(resumed.state,resumed.bestCombo));assert.equal(board.me.lifetime,resumed.state.lifetime);
  console.log('Server-timed offline rewards, 24-hour cap, repeat-claim prevention, forged-time rejection, idempotence, achievements and ranking updates passed.');
 }finally{

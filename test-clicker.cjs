@@ -30,7 +30,7 @@ assert.equal(old.equipped,'gold');assert.equal(G.offlinePerDay(old),43200);
 assert.equal(G.accrueOffline(old,30*3600),43200);assert.equal(old.bank,43300);assert.equal(old.offlineTotal,43200);
 assert.equal(G.accrueOffline(old,-10),0);
 assert.equal(G.buySkin(old,'lucky-gold'),false);assert.equal(G.rollGolden(old,.099),false);assert.equal(G.rollGolden(old,NaN),false);
-old.clicks=5000;assert.equal(G.rollGolden(old,.2),false);const power=G.perClick(old);assert.equal(G.rollGolden(old,0),true);assert.equal(G.perClick(old),power+250);assert.equal(G.rollGolden(old,0),false);
+old.clicks=5000;assert.equal(G.rollGolden(old,.2),false);const power=G.perClick(old);assert.equal(G.rollGolden(old,0),true);assert.equal(G.perClick(old),power+210);assert.equal(G.rollGolden(old,0),false);
 const badges=G.award(old,210);assert.ok(badges.includes('golden'));assert.ok(badges.includes('offline'));assert.ok(badges.includes('combo200'));assert.equal(G.award(old,210).length,0);
 console.log('Old saves, offline rate/day/cap, rare unlock eligibility, permanent boosts and one-time achievements passed.');
 

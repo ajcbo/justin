@@ -6,6 +6,9 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 const G=createRequire(import.meta.url)('./dist/clicker-core.js');
+const sorted=G.sortedSkins();assert.equal(sorted.length,G.skins.length);assert.equal(new Set(sorted.map(s=>s.id)).size,sorted.length);assert.deepEqual(sorted.map(s=>s.power),sorted.map(s=>s.power).sort((a,b)=>a-b),'Shop follows click bonus, including roll-only characters');
+const late=['neutral','miles','hamster','chair','stairs','purple','loki'].map(id=>G.skins.find(s=>s.id===id));for(let i=1;i<late.length;i++){assert.ok(late[i].power>late[i-1].power);assert.ok(late[i].power-late[i-1].power<=25,'Late-game click bonuses increase in small steps');assert.ok(late[i].cost>late[i-1].cost)}
+const rich=G.fresh();rich.bank=200000000;assert.ok(G.buySkin(rich,'loki'));assert.equal(G.perClick(rich),326);assert.equal(G.clean(rich).equipped,'loki');for(const id of ['gold','platinum','diamond','rainbow','lucky-gold'])assert.equal(G.buySkin(rich,id),false,'Rare faces remain roll-only');
 
 function tapping(cps){const s=G.fresh();for(let t=1000;t<61000;t+=1000/cps)G.rewardClick(s,t);return s}
 const relaxed=tapping(2),fast=tapping(6),automated=tapping(20);

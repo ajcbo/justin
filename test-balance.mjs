@@ -8,7 +8,7 @@ import path from 'node:path';
 const G=createRequire(import.meta.url)('./dist/clicker-core.js');
 const sorted=G.sortedSkins();assert.equal(sorted.length,G.skins.length);assert.equal(new Set(sorted.map(s=>s.id)).size,sorted.length);assert.deepEqual(sorted.map(s=>s.power),sorted.map(s=>s.power).sort((a,b)=>a-b),'Shop follows click bonus, including roll-only characters');
 const late=['neutral','miles','hamster','chair','stairs','purple','loki'].map(id=>G.skins.find(s=>s.id===id));for(let i=1;i<late.length;i++){assert.ok(late[i].power>late[i-1].power);assert.ok(late[i].power-late[i-1].power<=25,'Late-game click bonuses increase in small steps');assert.ok(late[i].cost>late[i-1].cost)}
-const rich=G.fresh();rich.bank=200000000;assert.ok(G.buySkin(rich,'loki'));assert.equal(G.perClick(rich),326);assert.equal(G.clean(rich).equipped,'loki');for(const id of ['gold','platinum','diamond','rainbow','lucky-gold'])assert.equal(G.buySkin(rich,id),false,'Rare faces remain roll-only');
+const rich=G.fresh();rich.bank=200000000;assert.ok(G.buySkin(rich,'loki'));assert.equal(G.basePerClick(rich),326);assert.equal(G.clean(rich).equipped,'loki');for(const id of ['gold','platinum','diamond','rainbow','lucky-gold'])assert.equal(G.buySkin(rich,id),false,'Rare faces remain roll-only');
 
 function tapping(cps){const s=G.fresh();for(let t=1000;t<61000;t+=1000/cps)G.rewardClick(s,t);return s}
 const relaxed=tapping(2),fast=tapping(6),automated=tapping(20);
@@ -17,15 +17,15 @@ assert.ok(automated.lifetime/fast.lifetime<1.25,'Automation has at most a small 
 assert.ok(automated.clicks<=fast.clicks+6,'Golden milestone speed stays within the six-tap burst allowance');
 const roundTrip=G.clean(JSON.parse(JSON.stringify(automated)));
 assert.equal(roundTrip.tapMeter.tokens,automated.tapMeter.tokens,'Reconciliation cannot refill tap budget');
-const beginner=G.fresh();for(let t=1000;t<31000;t+=500)G.rewardClick(beginner,t);
-assert.ok(G.buyBusiness(beginner,'finger'),'First gear is affordable in 30 seconds at two taps/sec');
+const beginner=G.fresh();for(let t=1000;t<16000;t+=500)G.rewardClick(beginner,t);
+assert.ok(G.buyBusiness(beginner,'finger'),'First gear is affordable in 15 seconds at two taps/sec');
 const target=G.fresh();G.scheduleCritical(target,1000,()=> 'test-target');
 assert.equal(target.critical,null);G.scheduleCritical(target,10999,()=> 'test-target');assert.equal(target.critical,null,'Target cannot spawn before ten seconds');G.scheduleCritical(target,11000,()=> 'test-target');assert.equal(target.nextCriticalAt,21000);
 const c={...target.critical};assert.equal(c.bonus,20);
 for(const [at,hit] of [[c.opens-1,{targetId:c.id,x:c.x,y:c.y}],[c.opens,{targetId:c.id,x:0,y:0}],[c.opens,{targetId:'forged',x:c.x,y:c.y}],[c.expires+1,{targetId:c.id,x:c.x,y:c.y}]])assert.equal(G.claimCritical(target,hit,at),0);
 target.levels.finger=3;
 const critical=G.rewardClick(target,c.opens,{targetId:c.id,x:c.x,y:c.y});
-assert.equal(critical.bonus,20);assert.equal(critical.amount,84);
+assert.equal(critical.bonus,20);assert.equal(critical.amount,168);
 assert.equal(G.rewardClick(target,c.opens+200,{targetId:c.id,x:c.x,y:c.y}).bonus,0,'One reward per target');
 for(let i=2;i<=5;i++){G.scheduleCritical(target,11000+(i-1)*10000,()=>String(i));assert.equal(target.critical.bonus,i===5?50:20);target.critical=null}
 
@@ -43,11 +43,11 @@ try{
  // Fixed client time stays inside the existing 500ms server tolerance.
  const hit={kind:'click',at:challenge.opens,targetId:challenge.id,x:challenge.x,y:challenge.y,bonus:1e12,amount:1e12};
  const result=await call('/api/play',{requestId:'critical-server-01',active:true,actions:[hit,{...hit,at:hit.at+1}]});
- assert.equal(result.state.bank,22,'Client reward fields ignored; target cannot be claimed twice');
+ assert.equal(result.state.bank,44,'Client reward fields ignored; target cannot be claimed twice');
  assert.equal(result.state.critical,null);
  const replay=await call('/api/play',{requestId:'critical-server-01',active:true,actions:[hit]});assert.deepEqual(replay,result,'Retry cannot repeat a critical payout');
  const invalid=await call('/api/play',{requestId:'critical-server-02',active:true,actions:[{kind:'click',at:hit.at+2,targetId:'invented',x:.5,y:.4,bonus:1e12}]});
- assert.equal(invalid.state.bank,23,'Invented targets never grant bonuses');
+ assert.equal(invalid.state.bank,46,'Invented targets never grant bonuses');
  console.log('Beginner affordability, diminishing click rewards, Golden milestone fairness, deterministic skill targets, coordinate/time checks, server authority and retry safety passed.');
 }finally{
  db?.close();if(server.exitCode===null)await new Promise(resolve=>{server.once('exit',resolve);server.kill('SIGTERM')});

@@ -2,14 +2,14 @@
  'use strict';
  const G=typeof module!=='undefined'&&module.exports?require('./clicker-core.js'):root.JustinGame;
  const toyItems=[
- {id:'dvd',name:'DVD Justin',cost:1500,desc:'A bouncing face. It is trying to hit the corner.',icon:'mouse'},
+ {id:'dvd',name:'DVD Justin',cost:1500,desc:'Bounces off the edges. Click for a corner ad.',icon:'mouse'},
  {id:'runner',name:'Tiny runner',cost:5000,desc:'He has somewhere to be.',icon:'glove'},
- {id:'marbles',name:'Marble race',cost:15000,desc:'Pick a colour. Watch it lose.',icon:'caffeine'},
+ {id:'marbles',name:'Marble race',cost:15000,desc:'A three-lane runner video at the bottom.',icon:'caffeine'},
  {id:'fish',name:'Justin aquarium',cost:50000,desc:'A deeply unqualified fish.',icon:'wifi'},
  {id:'loading',name:'Download simulator',cost:150000,desc:'99%. Any minute now.',icon:'datacenter'},
- {id:'portal',name:'Portal window',cost:500000,desc:'A small hole in the page.',icon:'satellite'},
+ {id:'portal',name:'Portal window',cost:500000,desc:'Appears occasionally. Click to visit another Justin page.',icon:'satellite'},
  {id:'peek',name:'Side-eye peek',cost:8000,desc:'He is checking on you.',icon:'intern'},
- {id:'spinner',name:'Spinning Justin',cost:25000,desc:'A tiny rotating Justin.',icon:'mouse'},
+ {id:'spinner',name:'Spinning Justin',cost:25000,desc:'Drag and flick to spin him.',icon:'mouse'},
  {id:'cursors',name:'Justin cursors',cost:100000,desc:'A few extra pointers. None of them help.',icon:'finger'},
  {id:'orbit',name:'Pocket solar system',cost:2000000,desc:'All planets are now Justin.',icon:'supply'}
  ];
@@ -40,9 +40,9 @@
   if(skin&&!found.length)amount+=duplicateAmount;
   const result=prize(s,label,amount,at,found.at(-1)||null);s.lastGift={...result};return result;
  }
- const boxCost=25000,boxDailyLimit=3;
+ const boxCost=150000,boxDailyLimit=3;
  function resolveRoll(s,kind,skin,at,ordinal){const amount=kind==='box'?Math.min(boxCost*.5,scaled(s,10)):scaled(s,60),fresh=skin?grant(s,skin):false;const reward=prize(s,skin?G.skins.find(x=>x.id===skin).name:'Points',amount,at,skin);reward.id=kind+':'+ordinal+':'+at;s.lastRoll={id:reward.id,kind,skin,amount,fresh,milestone:kind==='milestone'?ordinal:0};s.rollQueue=[...(s.rollQueue||[]),s.lastRoll].slice(-10);return s.lastRoll}
- function mysteryBox(s,at=Date.now(),roll=Math.random()){const p=prepare(s,at);if(!Number.isFinite(roll)||roll<0||roll>=1||p.boxesToday>=boxDailyLimit||s.bank<boxCost)return null;s.bank-=boxCost;p.boxesToday++;p.boxes++;const skin=roll<.05?'rainbow':roll<.20?'diamond':roll<.60?'platinum':roll<.70?'gold':null;return resolveRoll(s,'box',skin,at,p.boxes)}
+ function mysteryBox(s,at=Date.now(),roll=Math.random()){const p=prepare(s,at);if(!Number.isFinite(roll)||roll<0||roll>=1||p.boxesToday>=boxDailyLimit||s.bank<boxCost)return null;s.bank-=boxCost;p.boxesToday++;p.boxes++;const skin=roll<.005?'rainbow':roll<.025?'diamond':roll<.105?'platinum':roll<.15?'gold':null;return resolveRoll(s,'box',skin,at,p.boxes)}
  function milestoneRoll(s,at=Date.now(),roll=Math.random()){const p=prepare(s,at);if(!Number.isFinite(roll)||roll<0||roll>=1||!s.clicks||s.clicks%5000||p.milestone>=s.clicks)return null;p.milestone=s.clicks;const skin=roll<.2?'lucky-gold':roll<.35?'diamond':roll<.7?'platinum':null;const result=resolveRoll(s,'milestone',skin,at,s.clicks);if(skin==='lucky-gold'&&result.fresh)s.luckyHits=(s.luckyHits||0)+1;return result}
  const tasks=[{id:'tap',name:'500 clicks',goal:500,value:(s,p)=>s.clicks-p.startClicks,base:250},{id:'crit',name:'20 critical clicks',goal:20,value:(s,p)=>(s.critHits||0)-p.startCrits,base:400},{id:'buy',name:'Buy 10 upgrades',goal:10,value:(s,p)=>(s.purchases||0)-p.startBuys,base:350}];
  function tasksAt(at=Date.now()){const goals=[[500,20,10],[750,25,12],[1000,30,15]][day(at)%3];return tasks.map((t,i)=>({...t,goal:goals[i],name:t.id==='tap'?goals[i]+' clicks':t.id==='crit'?goals[i]+' critical clicks':'Buy '+goals[i]+' upgrades'}))}

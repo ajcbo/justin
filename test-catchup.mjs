@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const G=createRequire(import.meta.url)('./dist/progression-core.js');
+const s=G.fresh();assert.equal(G.perClick(s),2);assert.equal(G.basePerClick(s),1);assert.equal(G.rewardClick(s,1000).amount,2);assert.equal(s.lifetime,2);
+s.levels.chat=1;assert.equal(G.perSecond(s),2);assert.equal(G.basePerSecond(s),1);assert.equal(G.passiveAmount(s,1000,11000),20);assert.equal(G.passiveAmount(s,1000,11000,.25),2.5,'Offline earnings retain the original slower rate');
+const edge=G.fresh();edge.lifetime=1999999;assert.equal(G.catchupAmount(edge,100),100.5,'Only earnings before the threshold receive the extra half of the remaining assisted income');G.earn(edge,G.catchupAmount(edge,100));assert.equal(G.catchupMultiplier(edge),1);assert.equal(G.perClick(edge),1);
+assert.equal(G.catchupAmount(G.fresh(),1e12),1e12+1e6,'Large claims cannot multiply an entire offline/event payout beyond the threshold');
+edge.bank=0;assert.equal(G.catchupMultiplier(edge),1,'Spending cannot re-enable starter assistance');edge.runPoints=1e6;assert.ok(G.Progression.rebirth(edge,0));assert.equal(G.catchupMultiplier(edge),1,'Rebirth cannot re-enable starter assistance');
+const box=G.Progression;assert.equal(box.boxCost,150000);const counts={};for(let i=0;i<10000;i++){const n=G.fresh();n.bank=box.boxCost;const id=box.mysteryBox(n,Date.now(),i/10000).skin||'points';counts[id]=(counts[id]||0)+1}assert.deepEqual(counts,{rainbow:50,diamond:200,platinum:800,gold:450,points:8500});
+assert.equal(G.skins.find(x=>x.id==='classroom').name,'Bunny Justin');assert.equal(G.clean({version:1,owned:['normal','classroom'],equipped:'classroom'}).equipped,'classroom','Existing classroom ownership migrates directly to Bunny');
+console.log('Starter assistance, exact threshold/cap, permanent rates, offline balance, rebirth/spending resistance, new box odds and Bunny save compatibility passed.');

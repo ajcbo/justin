@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const G=require('./dist/clicker-core.js');
-const s=G.fresh();
+const s=G.fresh();s.lifetime=G.catchupLimit; /* Permanent economy beyond starter assistance. */
 assert.equal(G.buySkin(s,'pixel'),false);
 for(let i=0;i<400;i++)G.click(s);
 assert.equal(s.bank,400);assert.equal(s.clicks,400);
@@ -30,10 +30,10 @@ assert.equal(old.equipped,'gold');assert.equal(G.offlinePerDay(old),43200);
 assert.equal(G.accrueOffline(old,30*3600),43200);assert.equal(old.bank,43300);assert.equal(old.offlineTotal,43200);
 assert.equal(G.accrueOffline(old,-10),0);
 assert.equal(G.buySkin(old,'lucky-gold'),false);assert.equal(G.rollGolden(old,.099),false);assert.equal(G.rollGolden(old,NaN),false);
-old.clicks=5000;assert.equal(G.rollGolden(old,.2),false);const power=G.perClick(old);assert.equal(G.rollGolden(old,0),true);assert.equal(G.perClick(old),power+210);assert.equal(G.rollGolden(old,0),false);
+old.clicks=5000;assert.equal(G.rollGolden(old,.2),false);const power=G.basePerClick(old);assert.equal(G.rollGolden(old,0),true);assert.equal(G.basePerClick(old),power+210);assert.equal(G.rollGolden(old,0),false);
 const badges=G.award(old,210);assert.ok(badges.includes('golden'));assert.ok(badges.includes('offline'));assert.ok(badges.includes('combo200'));assert.equal(G.award(old,210).length,0);
 console.log('Old saves, offline rate/day/cap, rare unlock eligibility, permanent boosts and one-time achievements passed.');
 
-for(const clicks of [0,1,4999,5001,9999]){const s=G.fresh();s.clicks=clicks;assert.equal(G.rollGolden(s,0),false)}
-for(const clicks of [5000,10000,50000]){for(let i=0;i<10;i++){const s=G.fresh();s.clicks=clicks;assert.equal(G.rollGolden(s,i/10),i<2)}}
+for(const clicks of [0,1,4999,5001,9999]){const s=G.fresh();s.lifetime=G.catchupLimit; /* Permanent economy beyond starter assistance. */s.clicks=clicks;assert.equal(G.rollGolden(s,0),false)}
+for(const clicks of [5000,10000,50000]){for(let i=0;i<10;i++){const s=G.fresh();s.lifetime=G.catchupLimit; /* Permanent economy beyond starter assistance. */s.clicks=clicks;assert.equal(G.rollGolden(s,i/10),i<2)}}
 console.log('Golden drops only roll at multiples of 5,000, with exactly two winning outcomes out of ten.');

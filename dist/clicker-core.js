@@ -14,7 +14,7 @@
   {id:'thumbsup',name:'Approved by Justin',cost:400000,power:36,tag:'one thumb. unlimited approval.',filter:'none'},
   {id:'bedhead',name:'Just Woke Up Justin',cost:1500000,power:70,tag:'the alarm has lost',filter:'none'},
   {id:'announcement',name:'Breaking News Justin',cost:3000000,power:95,tag:'the microphone is his face',filter:'none'},
-  {id:'classroom',name:'Computer Lab Justin',cost:6000000,power:130,tag:'bro is waiting for Windows Update',filter:'none'},
+  {id:'classroom',name:'Bunny Justin',cost:6000000,power:130,tag:'same guy. longer ears.',filter:'none'},
   {id:'neutral',name:'Passport Photo Justin',cost:12000000,power:180,tag:'permission to leave the group chat',filter:'none'},
   {id:'miles',name:'Miles Morales Justin',cost:25000000,power:200,tag:'with great clicking comes no responsibility',filter:'none'},
   {id:'hamster',name:'Hamster Justin',cost:50000000,power:225,tag:'the scream is coming from inside the hamster',filter:'none'},
@@ -55,10 +55,12 @@
  const basePerClick=s=>(1+businesses.reduce((sum,b)=>sum+b.power*s.levels[b.id],0)+skins.filter(x=>s.owned.includes(x.id)).reduce((sum,x)=>sum+x.power,0))*rebirthMultiplier(s);
  const basePerSecond=s=>businesses.reduce((sum,b)=>sum+b.rate*s.levels[b.id],0)*rebirthMultiplier(s);
  const multiplier=(s,at=Date.now())=>(s.boosts||[]).reduce((n,b)=>at>=b.start&&at<b.end?Math.max(n,b.factor):n,1);
- const perClick=(s,at=Date.now())=>basePerClick(s)*multiplier(s,at);
- const perSecond=(s,at=Date.now())=>basePerSecond(s)*multiplier(s,at);
+ const catchupLimit=2000000,catchupMultiplier=s=>s.lifetime<catchupLimit?2:1;
+ const catchupAmount=(s,amount)=>amount+Math.min(Math.max(0,amount),Math.max(0,(catchupLimit-s.lifetime)/2));
+ const perClick=(s,at=Date.now())=>catchupAmount(s,basePerClick(s)*multiplier(s,at));
+ const perSecond=(s,at=Date.now())=>catchupAmount(s,basePerSecond(s)*multiplier(s,at));
  // Integrate only the overlap with each event. Strongest wins; boosts never stack.
- function passiveAmount(s,start,end,rate=1){if(!(end>start))return 0;const cuts=[start,end];for(const b of s.boosts||[]){if(b.start>start&&b.start<end)cuts.push(b.start);if(b.end>start&&b.end<end)cuts.push(b.end)}cuts.sort((a,b)=>a-b);let weighted=0;for(let i=1;i<cuts.length;i++)weighted+=(cuts[i]-cuts[i-1])*multiplier(s,(cuts[i]+cuts[i-1])/2);return basePerSecond(s)*weighted/1000*rate}
+ function passiveAmount(s,start,end,rate=1){if(!(end>start))return 0;const cuts=[start,end];for(const b of s.boosts||[]){if(b.start>start&&b.start<end)cuts.push(b.start);if(b.end>start&&b.end<end)cuts.push(b.end)}cuts.sort((a,b)=>a-b);let weighted=0;for(let i=1;i<cuts.length;i++)weighted+=(cuts[i]-cuts[i-1])*multiplier(s,(cuts[i]+cuts[i-1])/2);const amount=basePerSecond(s)*weighted/1000*rate;return rate===1?catchupAmount(s,amount):amount}
  const price=(s,b)=>Math.ceil(b.base*Math.pow(b.growth,s.levels[b.id]));
  function earn(s,amount){if(!Number.isFinite(amount)||amount<0)return;s.runPoints=Math.min(1e15,(s.runPoints||0)+amount);s.bank=Math.min(1e15,s.bank+amount);s.lifetime=Math.min(1e15,s.lifetime+amount)}
  function click(s,at=Date.now()){const amount=perClick(s,at);s.clicks++;earn(s,amount);return amount}
@@ -68,7 +70,7 @@
   const meter=s.tapMeter||(s.tapMeter={at:0,tokens:6});at=Math.max(meter.at,Number(at)||0);
   meter.tokens=Math.min(6,meter.tokens+Math.max(0,at-meter.at)*.006);meter.at=at;
   const full=meter.tokens>=1-1e-9;if(full)meter.tokens=Math.max(0,meter.tokens-1);
-  const bonus=claimCritical(s,hit,at),amount=perClick(s,at)*((full?1:.1)+bonus);
+  const bonus=claimCritical(s,hit,at),amount=catchupAmount(s,basePerClick(s)*multiplier(s,at)*((full?1:.1)+bonus));
   if(full)s.clicks++;earn(s,amount);return {amount,full,bonus};
  }
  function claimCritical(s,hit,at){const c=s.critical;if(!c||!hit||hit.targetId!==c.id||!Number.isFinite(hit.x)||!Number.isFinite(hit.y)||at<c.opens||at>c.expires||Math.hypot(hit.x-c.x,hit.y-c.y)>.075)return 0;s.critical=null;return c.bonus}
@@ -109,5 +111,5 @@
  function award(s,best=0){s.badges=s.badges||[];const added=[];for(const a of achievements)if(!s.badges.includes(a.id)&&a.value(s,best)>=a.goal){s.badges.push(a.id);added.push(a.id)}return added}
  const goatScore=(s,bestCombo=0)=>Math.floor(100*(4*Math.log10(s.lifetime+1)+3*Math.log10(basePerSecond(s)+1)+2*Math.log10(s.clicks+1)+2*(s.owned.length-1)+Math.log10(bestCombo+1)));
  const sortedSkins=()=>[...skins].sort((a,b)=>a.power-b.power||(a.cost??Infinity)-(b.cost??Infinity)||a.name.localeCompare(b.name));
- const api={sortedSkins,rebirthMultiplier,justinMultiplier,rewardClick,claimCritical,scheduleCritical,skins,backdrops,buyBackdrop,businesses,achievements,award,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore,basePerClick,basePerSecond,multiplier,passiveAmount,offlineRate,offlineCap,offlinePerDay,accrueOffline,rollGolden};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+ const api={catchupLimit,catchupMultiplier,catchupAmount,sortedSkins,rebirthMultiplier,justinMultiplier,rewardClick,claimCritical,scheduleCritical,skins,backdrops,buyBackdrop,businesses,achievements,award,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore,basePerClick,basePerSecond,multiplier,passiveAmount,offlineRate,offlineCap,offlinePerDay,accrueOffline,rollGolden};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

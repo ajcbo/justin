@@ -19,7 +19,7 @@ try{
  assert.equal((await request('/api/play','POST',action,{...sessionHeaders,'X-CSRF-Token':'invalid'})).status,403);
  const played=await request('/api/play','POST',action,sessionHeaders);assert.equal(played.data.state.clicks,1);
  assert.equal((await request('/api/session','GET',null,{Origin:origin,Cookie:originalCookie})).data.state.clicks,1);
- const board=await request('/api/leaderboard?metric=lifetime','GET',null,sessionHeaders);assert.equal(board.data.me.lifetime,1);
+ const board=await request('/api/leaderboard?metric=lifetime','GET',null,sessionHeaders);assert.equal(board.data.me.lifetime,2);
  const logout=await request('/api/logout','POST',{},sessionHeaders);assert.equal(logout.status,200);assert.match(logout.headers.get('set-cookie'),/Max-Age=0/);
  assert.equal((await request('/api/session','GET',null,sessionHeaders)).data.user,null);
  console.log('GitHub CORS/preflight, untrusted-origin denial, existing-account sign-in, partitioned private cookies, CSRF, ranked clicks, shared progress and logout passed.');

@@ -22,7 +22,7 @@ assert.equal(G.comboHit({count:9,at:0},100).rate,1);
 for(let i=50;i<210;i++)combo=G.comboHit(combo,i*100);assert.equal(combo.rate,4);assert.equal(combo.tier,4);
 combo=G.comboHit(combo,combo.at+G.comboWindow+1);assert.equal(combo.count,1);assert.equal(combo.rate,1);assert.equal(combo.tier,0);
 combo=G.comboHit(combo,combo.at+G.comboWindow);assert.equal(combo.count,2);
-assert.equal(G.comboHit({count:9999,at:0},100).count,9999);
+assert.equal(G.comboHit({count:9999,at:0},100).count,10000);
 console.log('Fast-click combo, rising pitch, pitch ceiling, expiry and boundary timing passed.');
 
 const old=G.clean({version:1,bank:100,lifetime:200,clicks:50,owned:['normal','gold'],equipped:'gold',levels:{chat:2},savedAt:1});

@@ -19,7 +19,7 @@ export function createAdministration(db,G,fail){
  INSERT OR IGNORE INTO game_meta VALUES('epoch','1');`);
  const get=key=>db.prepare('SELECT value FROM game_meta WHERE key=?').get(key)?.value;
  const put=(key,value)=>db.prepare('INSERT INTO game_meta VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,String(value));
- // Bind once to the existing, immutable account ID. Usernames cannot be changed.
+ // Bind once to the existing, immutable account ID. The owner binding survives username changes.
  if(!get('owner_id')){const owner=db.prepare('SELECT id FROM users WHERE username_key=?').get(process.env.ADMIN_OWNER_USERNAME?.toLowerCase()||'jacob');if(owner){db.prepare('INSERT OR IGNORE INTO admin_roles VALUES(?,?)').run(owner.id,Date.now());put('owner_id',owner.id)}}
  const epoch=()=>Number(get('epoch'));
  const isAdmin=id=>Boolean(db.prepare('SELECT 1 FROM admin_roles WHERE user_id=?').get(id));
@@ -30,7 +30,7 @@ export function createAdministration(db,G,fail){
  const muteStatement=db.prepare('SELECT until_at FROM sound_mutes WHERE user_id=?');
  const mutedUntil=id=>id?(muteStatement.get(id)?.until_at||0):0;
  function live(id=null){const now=Date.now();return {muteUntil:mutedUntil(id),announcements:db.prepare('SELECT a.id,a.message,a.created_at AS at,a.ends_at AS endsAt,u.username AS author FROM announcements a JOIN users u ON u.id=a.actor_id WHERE a.ends_at>? AND (a.target_id IS NULL OR a.target_id=?) ORDER BY a.created_at DESC LIMIT 5').all(now,id),serverNow:now}}
- function requireOwner(id){if(!isOwner(id))throw fail(403,'Only jacob can manage panel access or reset the whole game.')}
+ function requireOwner(id){if(!isOwner(id))throw fail(403,'Only the owner can manage panel access or reset the whole game.')}
  // Presence is a real play heartbeat, never an admin write or an offline settlement.
  const onlineSQL='EXISTS (SELECT 1 FROM player_presence h JOIN sessions s ON s.token_hash=h.session_hash WHERE h.user_id=p.user_id AND h.last_seen>? AND s.expires>?)';
  function presence(id,sessionHash,active,now=Date.now()){if(active)db.prepare('INSERT INTO player_presence VALUES(?,?,?) ON CONFLICT(session_hash) DO UPDATE SET user_id=excluded.user_id,last_seen=excluded.last_seen').run(sessionHash,id,now);else db.prepare('DELETE FROM player_presence WHERE session_hash=?').run(sessionHash);db.prepare('DELETE FROM player_presence WHERE last_seen<?').run(now-60000)}

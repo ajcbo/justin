@@ -84,8 +84,9 @@
  function buySkin(s,id){const skin=skins.find(x=>x.id===id);if(!skin||skin.luckyOnly||skin.dropOnly||s.owned.includes(id)||s.bank<skin.cost)return false;s.bank-=skin.cost;s.owned.push(id);s.equipped=id;return true}
  function buyBusiness(s,id){const b=businesses.find(x=>x.id===id);if(!b||s.levels[id]>=100)return false;const cost=price(s,b);if(s.bank<cost)return false;s.bank-=cost;s.levels[id]++;return true}
  function buyBackdrop(s,id){const b=backdrops.find(b=>b.id===id);if(!b||b.adminOnly||s.backdrops.includes(id)||s.bank<b.cost)return false;s.bank-=b.cost;s.backdrops.push(id);s.backdrop=id;return true}
- const comboWindow=650;
- function comboHit(previous,now){const count=previous&&now>=previous.at&&now-previous.at<=comboWindow?Math.min(previous.count+1,9999):1;return {count,at:now,rate:Math.pow(2,Math.min(24,Math.max(0,count-10)*.12)/12),tier:count>=200?4:count>=110?3:count>=50?2:count>=15?1:0}}
+ const comboWindow=650,comboLimit=1000000000000;
+ function inputTime(stamp,perf,wall){const t=Number(stamp),relative=t>1e12?t-wall+perf:t;return Number.isFinite(relative)&&relative>0?Math.max(perf-15000,Math.min(perf,relative)):perf}
+ function comboHit(previous,now){const count=previous&&now>=previous.at&&now-previous.at<=comboWindow?Math.min((Number(previous.count)||0)+1,comboLimit):1;return {count,at:now,rate:Math.pow(2,Math.min(24,Math.max(0,count-10)*.12)/12),tier:count>=200?4:count>=110?3:count>=50?2:count>=15?1:0}}
  const offlineRate=.25,offlineCap=86400;
  const offlinePerDay=(s,at=Date.now())=>passiveAmount(s,at,at+86400000,offlineRate);
  function accrueOffline(s,seconds,end=Date.now()){const amount=passiveAmount(s,end-Math.min(offlineCap,Math.max(0,Number(seconds)||0))*1000,end,offlineRate);earn(s,amount);s.offlineTotal=(s.offlineTotal||0)+amount;return amount}
@@ -111,5 +112,5 @@
  function award(s,best=0){s.badges=s.badges||[];const added=[];for(const a of achievements)if(!s.badges.includes(a.id)&&a.value(s,best)>=a.goal){s.badges.push(a.id);added.push(a.id)}return added}
  const goatScore=(s,bestCombo=0)=>Math.floor(100*(4*Math.log10(s.lifetime+1)+3*Math.log10(basePerSecond(s)+1)+2*Math.log10(s.clicks+1)+2*(s.owned.length-1)+Math.log10(bestCombo+1)));
  const sortedSkins=()=>[...skins].sort((a,b)=>a.power-b.power||(a.cost??Infinity)-(b.cost??Infinity)||a.name.localeCompare(b.name));
- const api={catchupLimit,catchupMultiplier,catchupAmount,sortedSkins,rebirthMultiplier,justinMultiplier,rewardClick,claimCritical,scheduleCritical,skins,backdrops,buyBackdrop,businesses,achievements,award,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore,basePerClick,basePerSecond,multiplier,passiveAmount,offlineRate,offlineCap,offlinePerDay,accrueOffline,rollGolden};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+ const api={inputTime,comboLimit,catchupLimit,catchupMultiplier,catchupAmount,sortedSkins,rebirthMultiplier,justinMultiplier,rewardClick,claimCritical,scheduleCritical,skins,backdrops,buyBackdrop,businesses,achievements,award,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore,basePerClick,basePerSecond,multiplier,passiveAmount,offlineRate,offlineCap,offlinePerDay,accrueOffline,rollGolden};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

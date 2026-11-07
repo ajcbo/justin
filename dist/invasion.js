@@ -77,8 +77,8 @@
   if(offer){const wait=Math.ceil((ev.start-at)/1000),left=Math.ceil((ev.ends-at)/1000),busy=joining===ev.index&&Date.now()<joiningUntil;call.querySelector('small').textContent=text.tag+(ev.countdown?' · INCOMING':' · HAPPENING NOW');call.querySelector('.invasion-call-body').textContent=text.body;call.dataset.variant=ev.variant;call.querySelector('.invasion-call-clock').textContent=ev.countdown?'starts in '+wait+'s':left+'s left';const join=call.querySelector('.invasion-join');join.disabled=busy;join.textContent=busy?'Joining…':'Join';
    if(announced!==ev.index){announced=ev.index;call.classList.remove('call-in');void call.offsetWidth;call.classList.add('call-in');sfx('notification')}}
   // 2. Countdown over the UFO clip once joined.
-  const counting=joined&&ev.countdown;count.hidden=!counting;if(counting){if(musicFor!==ev.index){musicFor=ev.index;window.JustinMusic?.event(ev.variant,'countdown',{until:Date.now()+(ev.start-at)})}window.JustinCinema?.tease(ev.variant)}
-  if(joined&&ev.active&&ev.ends-at<10000&&finalFor!==ev.index){finalFor=ev.index;window.JustinMusic?.final()}
+  const counting=joined&&ev.countdown;count.hidden=!counting;if(counting){if(musicFor!==ev.index){musicFor=ev.index;}window.JustinCinema?.tease(ev.variant)}
+  if(joined&&ev.active&&ev.ends-at<10000&&finalFor!==ev.index){finalFor=ev.index;}
   if(counting){const sec=Math.max(1,Math.ceil((ev.start-at)/1000));count.querySelector('small').textContent=text.tag+' IN';if(sec!==lastSecond){lastSecond=sec;count.querySelector('b').textContent=String(sec);count.classList.toggle('final',sec<=3);if(!reduced()){count.classList.remove('tick');void count.offsetWidth;count.classList.add('tick')}if(sec<=3)sfx('crit-good')}}
   // 3. Start: the invaders spill out across the whole screen.
   const live=joined&&ev.active;
@@ -87,10 +87,10 @@
   if(live&&!abilityBusy&&intro!==ev.index&&!arena&&caught<ev.targets&&cleared!==ev.index)build(ev,s,{instant:true,elapsed:(at-ev.start)/1000});
   // 4. HUD during the event.
   if(!previewing){if(!live||barFor!==ev.index)hud.hidden=true;else setBar(caught,ev.targets,Math.ceil((ev.ends-at)/1000),Math.max(2,G.multiplier(s)))}
-  if(live&&caught>=ev.targets&&cleared!==ev.index){cleared=ev.index;stamp('3× BOOST!');sfx('reveal-epic');el('game-message').textContent='Invasion cleared! 3× earnings until it ends.';window.JustinMusic?.event(ev.variant,'victory');if(arena&&!arena.preview){const a=arena;outroFor=a.index;ending(a).then(()=>report(a,ev.targets))}}
+  if(live&&caught>=ev.targets&&cleared!==ev.index){cleared=ev.index;stamp('3× BOOST!');sfx('reveal-epic');el('game-message').textContent='Invasion cleared! 3× earnings until it ends.';if(arena&&!arena.preview){const a=arena;outroFor=a.index;ending(a).then(()=>report(a,ev.targets))}}
   // 5. Wrap-up.
   if(arena&&!arena.preview&&(!live||arena.index!==ev.index)){if(outroFor!==arena.index){const a=arena;outroFor=a.index;ending(a).then(()=>report(a,P.invasion(serverNow()).index===a.index?(game.snapshot().progress?.encounterHour===a.index?game.snapshot().progress.encounters.length:a.caughtLocal):a.caughtLocal))}else teardown()}
-  if(started===ev.index&&!ev.active&&ended!==ev.index){ended=ev.index;window.JustinMusic?.event(ev.variant,'end');const missed=ev.targets-caught;el('game-message').textContent=missed>0?missed+' invader'+(missed===1?'':'s')+' got away. Next invasion: '+ev.nextName+' in about '+Math.round((ev.next-at)/60000)+' minutes.':'The invasion is over. Next: '+ev.nextName+'.'}
+  if(started===ev.index&&!ev.active&&ended!==ev.index){ended=ev.index;const missed=ev.targets-caught;el('game-message').textContent=missed>0?missed+' invader'+(missed===1?'':'s')+' got away. Next invasion: '+ev.nextName+' in about '+Math.round((ev.next-at)/60000)+' minutes.':'The invasion is over. Next: '+ev.nextName+'.'}
 }
  setInterval(update,200);update();
  // Owner Cutscene Lab: the same intro, a short practice round with no rewards, then the ending.
@@ -98,6 +98,6 @@
   if(window.JustinCinema)await window.JustinCinema.invasionIntro(variant,{onSlam:()=>showBar(v.name+' · PREVIEW',v.targets),deploy:m=>{ship=m}});else showBar(v.name+' · PREVIEW',v.targets);
   build(ev,s,{preview:true,instant:true,mothership:ship});const a=arena,end=performance.now()+40000;
   await new Promise(resolve=>{const tick=setInterval(()=>{if(arena!==a){clearInterval(tick);resolve();return}setBar(a.caughtLocal,a.total,Math.max(0,Math.ceil((end-performance.now())/1000)),a.caughtLocal>=a.total?3:2);if(a.caughtLocal>=a.total||performance.now()>end){clearInterval(tick);resolve()}},200)});
-  hud.hidden=true;if(a.caughtLocal>=a.total)window.JustinMusic?.event(variant,'victory');if(arena===a)await ending(a);window.JustinMusic?.event(variant,'end');report(a,a.caughtLocal);return true}finally{previewing=false;hud.hidden=true}}
+  hud.hidden=true;if(arena===a)await ending(a);report(a,a.caughtLocal);return true}finally{previewing=false;hud.hidden=true}}
  window.JustinInvasion={preview,variants:P.invasionVariants};
 })();

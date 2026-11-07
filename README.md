@@ -102,16 +102,9 @@ A "Join Justin Invasion?" popup appears 20 seconds early (naming the variant) an
 
 test-invasion.mjs covers the variant rotation, per-variant target limits, the schedule, the boost maths, the catches, the odds, save validation and the server checks.
 
-## Music and sound
+## Sound effects
 
-All music is original and synthesized live in the browser (`soundtrack.js`): nothing is downloaded and nothing is licensed. A look-ahead 16th-note sequencer plays one theme at a time on a music bus that shares gui-audio's context, limiter and reverb room.
-
-- **Background music** (header ♪ button or Settings, off by default): a soft lo-fi loop that gains hats, snare, pads and bells as your combo tier rises. It pauses while the "make him dance" song plays and during cutscenes.
-- **Invasion themes** (Settings → invasion and cutscene music, on by default): a heartbeat-and-drone countdown that tightens as the start nears; silence during the entrance; then each variant's theme lands on the slam. Swarm is a frantic 150 BPM pluck ostinato; Giant is slow taiko and low brass; Loki is a ticking clock with whole-tone bells and glitch stutters; UFO is a theremin melody over an arpeggio. The last 10 seconds speed up, a full clear switches to a major-key victory loop, and the music fades at the end. The dance song is ducked during an event.
-- **Sound effects:** cinematic hits (impacts, booms, gong, footsteps, crashes) go through a synthetic reverb. New cues: riser, sub boom, gong, shimmer, brass, heartbeat, per-variant catch sounds (squish, ow, zap, glitch), a combo tier-up chime, a ping when a critical target appears, a music box for collections, and a cheer and fanfare for community goals.
-- Music volume and toggles are separate from interface sounds. Admin sound mutes, hidden tabs and reduced audio settings silence the music bus immediately.
-
-**Custom invasion tracks:** an invasion theme can be replaced with an audio file by listing it in `assets/music/tracks.json`, for example `{"loki": "assets/music/loki.mp3"}`. It then starts with that variant's entrance and loops through the event. Only files listed there are requested. Only use audio you have the rights to publish; music ripped from YouTube or other services must not be added. Players can also pick **their own** track per invasion in Settings → Music. That file is kept only in their browser (IndexedDB), plays only for them, and is never uploaded, which is the right way to use a personal copy of a commercial song.
+The game has no background music of its own (the optional "make him dance" songs are unchanged). Sound effects are synthesized live in the browser through gui-audio.js and respect its on/off, volume and admin-mute settings. Cinematic hits (impacts, booms, gong, footsteps, crashes) go through a synthetic reverb. Cues include a riser, sub boom, gong, shimmer, brass, heartbeat, per-variant invasion catch sounds (squish, ow, zap, glitch), a combo tier-up chime, a ping when a critical target appears, a music box for collections, and a cheer and fanfare for community goals.
 
 **Event cutscenes:** each invasion entrance now has a vignette, a riser into the reveal, a white flash and sub boom on the slam, and a trailer title card ("THEY’RE HERE.", "HE IS ENORMOUS.", "TIME IS BROKEN.", "WE ARE NOT ALONE."). During the countdown, joined players get small teasers in the stage (a tiny head peeking, footsteps with falling dust, a green glitch, a light crossing the sky). Every invasion ends with a result card: INVASION REPELLED or THEY GOT AWAY, how many were caught, and what's next.
 

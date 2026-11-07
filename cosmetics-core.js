@@ -19,7 +19,7 @@
  const validId=id=>typeof id==='string'&&/^[A-Za-z0-9-]{8,80}$/.test(id);
  function cleanActive(a){if(!a||!validId(a.id)||!byId(a.cosmetic)||![a.start,a.ends,a.budget].every(Number.isFinite)||a.ends<=a.start||a.ends-a.start>abilityWindow)return null;return {id:a.id,cosmetic:a.cosmetic,start:a.start,ends:a.ends,budget:int(a.budget,1e12),units:Math.min(int(a.units),byId(a.cosmetic).units),lastHit:Number.isFinite(a.lastHit)?a.lastHit:0}}
  function fields(raw={}){const c=raw.cosmetics||{},a=raw.ability||{},owned=Array.isArray(c.owned)?cosmetics.filter(x=>c.owned.includes(x.id)).map(x=>x.id):[];
-  return {cosmetics:{owned,equipped:owned.includes(c.equipped)?c.equipped:null},ability:{readyAt:Number.isFinite(a.readyAt)?Math.max(0,a.readyAt):0,active:cleanActive(a.active),settled:Array.isArray(a.settled)?a.settled.filter(validId).slice(-20):[],last:a.last&&validId(a.last.id)&&byId(a.last.cosmetic)?{id:a.last.id,cosmetic:a.last.cosmetic,reward:int(a.last.reward,1e12),units:int(a.last.units),at:Number(a.last.at)||0}:null}}}
+  return {cosmetics:{owned,equipped:owned.includes(c.equipped)?c.equipped:null},ability:{readyAt:Number.isFinite(a.readyAt)?Math.max(0,a.readyAt):0,active:cleanActive(a.active),settled:Array.isArray(a.settled)?a.settled.filter(validId).slice(-20):[],last:a.last&&validId(a.last.id)&&byId(a.last.cosmetic)?{id:a.last.id,cosmetic:a.last.cosmetic,reward:int(a.last.reward,1e12),units:int(a.last.units),at:Number(a.last.at)||0,start:Number(a.last.start)||0}:null}}}
  const originalFresh=G.fresh,originalClean=G.clean,originalPrepare=P.prepare;
  G.fresh=()=>Object.assign(originalFresh(),fields());
  G.clean=raw=>Object.assign(originalClean(raw),fields(raw||{}));
@@ -37,9 +37,13 @@
  function hitAbility(s,id,at=Date.now()){ensure(s);const a=s.ability.active;if(!a||a.id!==id||!Number.isFinite(at)||at<a.start||at>a.ends||at-a.lastHit<minHitGap)return false;const cap=byId(a.cosmetic).units;if(a.units>=cap)return false;a.units++;a.lastHit=at;return true}
  function settle(s,at){const a=s.ability.active;if(!a)return null;const cap=byId(a.cosmetic).units,reward=Math.round(a.budget*(participation+(1-participation)*Math.min(1,a.units/cap)));
   // Rewards go straight to the wallet: no clicks, no full-value milestones, no Golden-roll attempts.
-  G.earn(s,reward);s.ability.settled=[...s.ability.settled,a.id].slice(-20);s.ability.last={id:a.id,cosmetic:a.cosmetic,reward,units:a.units,at};s.ability.active=null;return s.ability.last}
+  G.earn(s,reward);s.ability.settled=[...s.ability.settled,a.id].slice(-20);s.ability.last={id:a.id,cosmetic:a.cosmetic,reward,units:a.units,at,start:a.start};s.ability.active=null;return s.ability.last}
  function finishAbility(s,id,at=Date.now()){ensure(s);const a=s.ability.active;if(a&&a.id===id)return settle(s,Math.min(at,a.ends));return s.ability.last?.id===id?s.ability.last:null}
 
- G.cosmetics=cosmetics;G.Cosmetics={cosmetics,byId,buyCosmetic,equipCosmetic,abilityBudget,abilityReady,startAbility,hitAbility,finishAbility,invasionBusy,abilityCooldown,abilityWindow,abilityBudgetSeconds,participation,minHitGap};
+ // Abilities pause the click combo: a combo that was alive when the activity started survives the activity
+ // (plus a short grace for the result card), so the next click continues it instead of starting over.
+ const comboGrace=5000;
+ function resumeCombo(combo,at,s){ensure(s);if(!combo||!Number.isFinite(at))return combo;const a=s.ability.active,l=s.ability.last,from=a?a.start:l?.start,to=a?Infinity:l?.at;if(!from||combo.at<from-G.comboWindow||combo.at>(a?at:to))return combo;if(at-combo.at<=G.comboWindow)return combo;if(a||at<=to+comboGrace)return {...combo,at:at-1};return combo}
+ G.cosmetics=cosmetics;G.Cosmetics={cosmetics,byId,buyCosmetic,equipCosmetic,abilityBudget,abilityReady,startAbility,hitAbility,finishAbility,invasionBusy,abilityCooldown,abilityWindow,abilityBudgetSeconds,participation,minHitGap,resumeCombo,comboGrace};
  if(typeof module!=='undefined'&&module.exports)module.exports=G;
 })(typeof window!=='undefined'?window:globalThis);

@@ -61,3 +61,4 @@
 .cosmetic-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
 body.ability-running #toy-screen,body.ability-running .critical-target,body.ability-running .justin-bubble,body.ability-running #invasion-call{visibility:hidden}
 @media(prefers-reduced-motion:reduce){.ability-arena,.ab-result,#ability-button[data-state=ready]{animation:none}}
+.combo-hud.combo-paused .combo-meter span{background:repeating-linear-gradient(-45deg,#b28ef5 0 6px,#d9c9ff 6px 12px)}.combo-hud.combo-paused #combo-count::after{content:' · paused';font-size:11px;color:#6a4fb0}

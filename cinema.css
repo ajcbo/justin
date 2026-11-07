@@ -147,12 +147,6 @@
 .tease-dust{top:0;width:4px;height:4px;border-radius:50%;background:#8b8478}
 .tease-glitch{inset:0;background:repeating-linear-gradient(0deg,#3dff9a33 0 3px,transparent 3px 9px);mix-blend-mode:multiply;opacity:0}
 .tease-light{top:12%;left:0;width:9px;height:9px;border-radius:50%;background:#fff;box-shadow:0 0 12px 4px #fffbcc,-40px 0 18px -2px #fffbcc90}
-/* Header music toggle */
-#music-toggle{width:44px;padding:9px}
-#music-toggle[aria-pressed=true]{background:#e9dcff;box-shadow:0 2px 0 #222,inset 0 0 0 2px #b28ef5}
-#music-toggle[aria-pressed=true] .ui-icon{animation:note-bob 1.2s ease-in-out infinite}
-@keyframes note-bob{50%{transform:translateY(-2px) rotate(-6deg)}}
-@media(prefers-reduced-motion:reduce){#music-toggle .ui-icon{animation:none!important}}
 
 .cine-title.floating{position:fixed;z-index:112;transform:translate(-50%,-50%)}
 

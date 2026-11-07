@@ -42,8 +42,8 @@
 
  /* ---------- cinematic language shared by the invasion entrances ---------- */
  const trailer={swarm:['THEY’RE HERE.','TINY JUSTIN SWARM'],giant:['HE IS ENORMOUS.','GIANT JUSTIN'],loki:['TIME IS BROKEN.','LOKI INVASION'],ufo:['WE ARE NOT ALONE.','UFO INVASION']};
- function cue(token,variant,riserAt,bars=true){window.JustinMusic?.event(variant,'silence');const v=add(token,'cine-vignette');anim(token,v,[{opacity:0},{opacity:1}],{duration:700});if(bars){token.bars=letterbox(token)}if(riserAt!=null)at(token,riserAt,()=>sfx('riser'))}
- function slam(token,variant){window.JustinMusic?.event(variant,'theme');sfx('boom');const [line,sub]=trailer[variant],card=document.createElement('div');card.className='cine-title floating';card.setAttribute('aria-hidden','true');card.innerHTML='<b></b><span></span>';document.body.append(card);setTimeout(()=>card.remove(),1600);card.querySelector('b').textContent=line;card.querySelector('span').textContent=sub;card.animate([{opacity:0,transform:'translate(-50%,-50%) scale(1.25)',letterSpacing:'.5em'},{opacity:1,transform:'translate(-50%,-50%) scale(1)',letterSpacing:'.08em',offset:.25},{opacity:1,transform:'translate(-50%,-50%) scale(.98)',offset:.8},{opacity:0,transform:'translate(-50%,-50%) scale(.96)'}],{duration:1500,easing:'ease-out',fill:'forwards'});const flash=add(token,'cine-flash');anim(token,flash,[{opacity:.65},{opacity:0}],{duration:420,easing:'ease-out'});if(token.bars)at(token,700,()=>token.bars())}
+ function cue(token,variant,riserAt,bars=true){const v=add(token,'cine-vignette');anim(token,v,[{opacity:0},{opacity:1}],{duration:700});if(bars){token.bars=letterbox(token)}if(riserAt!=null)at(token,riserAt,()=>sfx('riser'))}
+ function slam(token,variant){sfx('boom');const [line,sub]=trailer[variant],card=document.createElement('div');card.className='cine-title floating';card.setAttribute('aria-hidden','true');card.innerHTML='<b></b><span></span>';document.body.append(card);setTimeout(()=>card.remove(),1600);card.querySelector('b').textContent=line;card.querySelector('span').textContent=sub;card.animate([{opacity:0,transform:'translate(-50%,-50%) scale(1.25)',letterSpacing:'.5em'},{opacity:1,transform:'translate(-50%,-50%) scale(1)',letterSpacing:'.08em',offset:.25},{opacity:1,transform:'translate(-50%,-50%) scale(.98)',offset:.8},{opacity:0,transform:'translate(-50%,-50%) scale(.96)'}],{duration:1500,easing:'ease-out',fill:'forwards'});const flash=add(token,'cine-flash');anim(token,flash,[{opacity:.65},{opacity:0}],{duration:420,easing:'ease-out'});if(token.bars)at(token,700,()=>token.bars())}
 
  /* ---------- countdown teasers: small, non-blocking hints of what is coming ---------- */
  let lastTease=0;function tease(variant){if(reduced()||performance.now()-lastTease<2500||current)return;lastTease=performance.now();const r=stage.getBoundingClientRect(),bits=[];const temp=(cls,html='')=>{const e=document.createElement('div');e.className='tease '+cls;e.innerHTML=html;stage.append(e);bits.push(e);return e};setTimeout(()=>bits.forEach(b=>b.remove()),1800);
@@ -143,7 +143,7 @@
  const quickIntro={swarm:'THEY’RE HERE.',giant:'GIANT JUSTIN',loki:'TIMELINE BROKEN',ufo:'THEY HAVE ARRIVED'};
  window.JustinCinema={
   playing:()=>Boolean(current),
-  invasionIntro:(variant,o={})=>run('intro-'+variant,async token=>{if(reduced()){o.onSlam?.();await still(token,quickIntro[variant],'',1100);return}try{await intros[variant](token,o)}finally{if(o.preview)window.JustinMusic?.event(variant,'end')}}),
+  invasionIntro:(variant,o={})=>run('intro-'+variant,async token=>{if(reduced()){o.onSlam?.();await still(token,quickIntro[variant],'',1100);return}await intros[variant](token,o)}),
   invasionOutro:(variant,o={})=>run('outro-'+variant,async token=>{if(reduced()){await step(token,300);return}await outros[variant](token,o)}),
   result:info=>run('result',token=>result(token,info)),
   tease,

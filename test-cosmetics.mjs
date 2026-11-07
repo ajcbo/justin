@@ -34,6 +34,12 @@ assert.equal(C.startAbility(s,'activation-0001',t+C.abilityCooldown*3),null,'Act
 const boosted=G.clean(JSON.parse(JSON.stringify(rich)));boosted.boosts=[{start:0,end:9e15,factor:50}];boosted.lifetime=0;assert.equal(C.abilityBudget(boosted),C.abilityBudget(rich),'Admin boosts and catch-up do not inflate rewards');
 // Rebirth keeps cosmetics and the ability state.
 const reborn=G.clean(JSON.parse(JSON.stringify(s)));reborn.runPoints=1e6;assert.ok(P.rebirth(reborn,0));assert.deepEqual(reborn.cosmetics,s.cosmetics);assert.equal(reborn.ability.readyAt,s.ability.readyAt);
+// Abilities pause the combo: a live combo continues after the activity, a stale one does not.
+{const p=G.clean(JSON.parse(JSON.stringify(rich)));p.cosmetics.equipped='hero';const t=2e12;let combo=null;for(let i=0;i<30;i++)combo=G.comboHit(combo,t-3000+i*100);
+ C.startAbility(p,'activation-pause1',t);C.finishAbility(p,'activation-pause1',t+20000);
+ assert.equal(G.comboHit(C.resumeCombo(combo,t+21000,p),t+21000).count,31,'Combo continues after an ability');
+ assert.equal(G.comboHit(C.resumeCombo(combo,t+20000+C.comboGrace+1000,p),t+20000+C.comboGrace+1000).count,1,'Combo ends if you wait too long afterwards');
+ const stale=G.comboHit(null,t-60000);assert.equal(G.comboHit(C.resumeCombo(stale,t+21000,p),t+21000).count,1,'A combo that had already ended is not revived')}
 // Invasions and abilities never share the stage.
 const busy=G.clean(JSON.parse(JSON.stringify(rich)));busy.cosmetics.equipped='hero';const start=5900001*P.invasionEvery;P.joinInvasion(busy,start-5000);assert.equal(C.startAbility(busy,'activation-0005',start+1000),null,'No activation during a joined invasion');assert.ok(C.startAbility(busy,'activation-0006',start+P.invasionLength+1000),'Ready charge is kept for after the invasion');
 // Saves: forged fields are cleaned.
@@ -61,7 +67,7 @@ try{
  const t1=await owner('/api/admin/take',{requestId:'cos-take-0001',username:'Cosmetic_Test',kind:'cosmetic',item:'time'});assert.equal(t1.status,200,JSON.stringify(t1.data));
  r=await play(player,[]);assert.deepEqual(r.data.state.cosmetics.owned,['trouble'],'Owner grant/remove of cosmetics');
  const denied=await player('/api/admin/grant',{requestId:'cos-grant-0002',username:'Cosmetic_Test',kind:'cosmetic',item:'hero'});assert.notEqual(denied.status,200,'Players cannot grant cosmetics');
- console.log('Cosmetic catalogue, no permanent earnings, one slot, shared cooldown across outfits/saves/devices, capped and spaced hits, idempotent settlement, participation on interruption, budget without boosts or catch-up, no click milestones, rebirth retention, invasion coordination, forged saves, server validation, retries and owner grant/remove passed.');
+ console.log('Combo pause during abilities, cosmetic catalogue, no permanent earnings, one slot, shared cooldown across outfits/saves/devices, capped and spaced hits, idempotent settlement, participation on interruption, budget without boosts or catch-up, no click milestones, rebirth retention, invasion coordination, forged saves, server validation, retries and owner grant/remove passed.');
 }finally{
  db?.close();if(server)await halt();
  if(!path.resolve(directory).startsWith(path.resolve(os.tmpdir())+path.sep+'justin-cosmetics-test-'))throw Error('Unexpected cleanup directory');

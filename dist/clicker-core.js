@@ -25,6 +25,7 @@
   {id:'platinum',dropOnly:true,name:'Platinum Justin',cost:null,power:100,tag:'daily gift 20% · mystery box 40% · guaranteed gift 7',filter:'none',rarity:'epic'},
   {id:'diamond',dropOnly:true,name:'Diamond Justin',cost:null,power:175,tag:'daily gift 8% · mystery box 15% · guaranteed gift 30',filter:'none',rarity:'legendary'},
   {id:'rainbow',dropOnly:true,name:'Rainbow Justin',cost:null,power:235,tag:'daily gift 2% · mystery box 5% · guaranteed gift 90',filter:'none',rarity:'mythic'},
+  {id:'invader',name:'Invader Justin',cost:null,power:150,tag:'Justin Invasion exclusive · clear all three escapees',filter:'none',dropOnly:true,rarity:'epic'},
   {id:'party',name:'Party Justin',cost:null,power:0,tag:'community milestone: 50,000 clicks',filter:'none',dropOnly:true,rarity:'special'},
   {id:'lucky-gold',name:'Golden Justin',cost:null,power:210,tag:'20% chance at each 5,000-click roll.',filter:'golden',luckyOnly:true}
  ];
@@ -54,13 +55,15 @@
  const rebirthMultiplier=s=>1+Math.max(0,Math.min(13,s.rebirths||0))*.5;const justinMultiplier=rebirthMultiplier;
  const basePerClick=s=>(1+businesses.reduce((sum,b)=>sum+b.power*s.levels[b.id],0)+skins.filter(x=>s.owned.includes(x.id)).reduce((sum,x)=>sum+x.power,0))*rebirthMultiplier(s);
  const basePerSecond=s=>businesses.reduce((sum,b)=>sum+b.rate*s.levels[b.id],0)*rebirthMultiplier(s);
- const multiplier=(s,at=Date.now())=>(s.boosts||[]).reduce((n,b)=>at>=b.start&&at<b.end?Math.max(n,b.factor):n,1);
+ // Admin boosts and a joined Justin Invasion share one rule: the strongest active factor wins; they never stack.
+ const activeBoosts=s=>s.invasionBoost?[...(s.boosts||[]),s.invasionBoost]:(s.boosts||[]);
+ const multiplier=(s,at=Date.now())=>activeBoosts(s).reduce((n,b)=>at>=b.start&&at<b.end?Math.max(n,b.factor):n,1);
  const catchupLimit=2000000,catchupMultiplier=s=>s.lifetime<catchupLimit?2:1;
  const catchupAmount=(s,amount)=>amount+Math.min(Math.max(0,amount),Math.max(0,(catchupLimit-s.lifetime)/2));
  const perClick=(s,at=Date.now())=>catchupAmount(s,basePerClick(s)*multiplier(s,at));
  const perSecond=(s,at=Date.now())=>catchupAmount(s,basePerSecond(s)*multiplier(s,at));
  // Integrate only the overlap with each event. Strongest wins; boosts never stack.
- function passiveAmount(s,start,end,rate=1){if(!(end>start))return 0;const cuts=[start,end];for(const b of s.boosts||[]){if(b.start>start&&b.start<end)cuts.push(b.start);if(b.end>start&&b.end<end)cuts.push(b.end)}cuts.sort((a,b)=>a-b);let weighted=0;for(let i=1;i<cuts.length;i++)weighted+=(cuts[i]-cuts[i-1])*multiplier(s,(cuts[i]+cuts[i-1])/2);const amount=basePerSecond(s)*weighted/1000*rate;return rate===1?catchupAmount(s,amount):amount}
+ function passiveAmount(s,start,end,rate=1){if(!(end>start))return 0;const cuts=[start,end];for(const b of activeBoosts(s)){if(b.start>start&&b.start<end)cuts.push(b.start);if(b.end>start&&b.end<end)cuts.push(b.end)}cuts.sort((a,b)=>a-b);let weighted=0;for(let i=1;i<cuts.length;i++)weighted+=(cuts[i]-cuts[i-1])*multiplier(s,(cuts[i]+cuts[i-1])/2);const amount=basePerSecond(s)*weighted/1000*rate;return rate===1?catchupAmount(s,amount):amount}
  const price=(s,b)=>Math.ceil(b.base*Math.pow(b.growth,s.levels[b.id]));
  function earn(s,amount){if(!Number.isFinite(amount)||amount<0)return;s.runPoints=Math.min(1e15,(s.runPoints||0)+amount);s.bank=Math.min(1e15,s.bank+amount);s.lifetime=Math.min(1e15,s.lifetime+amount)}
  function click(s,at=Date.now()){const amount=perClick(s,at);s.clicks++;earn(s,amount);return amount}
@@ -70,15 +73,19 @@
   const meter=s.tapMeter||(s.tapMeter={at:0,tokens:6});at=Math.max(meter.at,Number(at)||0);
   meter.tokens=Math.min(6,meter.tokens+Math.max(0,at-meter.at)*.006);meter.at=at;
   const full=meter.tokens>=1-1e-9;if(full)meter.tokens=Math.max(0,meter.tokens-1);
-  const bonus=claimCritical(s,hit,at),amount=catchupAmount(s,basePerClick(s)*multiplier(s,at)*((full?1:.1)+bonus));
-  if(full)s.clicks++;earn(s,amount);return {amount,full,bonus};
+  const target=s.critical,bonus=claimCritical(s,hit,at),grade=bonus?criticalGrade(target,at).grade:null,amount=catchupAmount(s,basePerClick(s)*multiplier(s,at)*((full?1:.1)+bonus));
+  if(full)s.clicks++;earn(s,amount);return {amount,full,bonus,grade};
  }
- function claimCritical(s,hit,at){const c=s.critical;if(!c||!hit||hit.targetId!==c.id||!Number.isFinite(hit.x)||!Number.isFinite(hit.y)||at<c.opens||at>c.expires||Math.hypot(hit.x-c.x,hit.y-c.y)>.075)return 0;s.critical=null;return c.bonus}
+ // Timing ring: it closes on the target every criticalPeriod ms, starting one period after the target opens.
+ // Server and client grade the same press timestamp, so accuracy is validated exactly like the target itself.
+ const criticalPeriod=1100,criticalGrades=[{grade:'perfect',within:90,factor:2},{grade:'great',within:220,factor:1.5},{grade:'good',within:Infinity,factor:1}];
+ function criticalGrade(c,at){if(!c||!Number.isFinite(at))return criticalGrades[2];const elapsed=at-c.opens,beat=Math.max(1,Math.round(elapsed/criticalPeriod)),error=Math.abs(elapsed-beat*criticalPeriod);return criticalGrades.find(g=>error<=g.within)}
+ function claimCritical(s,hit,at){const c=s.critical;if(!c||!hit||hit.targetId!==c.id||!Number.isFinite(hit.x)||!Number.isFinite(hit.y)||at<c.opens||at>c.expires||Math.hypot(hit.x-c.x,hit.y-c.y)>.075)return 0;s.critical=null;return Math.round(c.bonus*criticalGrade(c,at).factor)}
  // Targets are skill rewards, not RNG: every fifth target is worth ten clicks.
  function scheduleCritical(s,now,id=()=>String(now)){
   if(s.critical&&now>s.critical.expires)s.critical=null;
   if(!s.nextCriticalAt||s.nextCriticalAt>now+10000)s.nextCriticalAt=now+10000;
-  if(!s.critical&&now>=s.nextCriticalAt){const cycle=(s.criticalCycle||0)+1;s.criticalCycle=cycle;s.critical={id:id(),x:[.14,.83,.23,.7,.48,.87,.35,.12,.77,.53][(cycle-1)%10],y:[.23,.68,.78,.19,.52,.38,.16,.62,.82,.3][(cycle-1)%10],bonus:cycle%5===0?50:20,opens:now+500,expires:now+5500};s.nextCriticalAt=now+10000}
+  if(!s.critical&&now>=s.nextCriticalAt){const cycle=(s.criticalCycle||0)+1;s.criticalCycle=cycle;s.critical={id:id(),x:[.14,.83,.23,.7,.5,.87,.35,.12,.77,.53][(cycle-1)%10],y:[.23,.68,.78,.19,.16,.38,.16,.62,.82,.3][(cycle-1)%10],bonus:cycle%5===0?50:20,opens:now+500,expires:now+5500};s.nextCriticalAt=now+10000}
   return s.critical;
  }
  function buySkin(s,id){const skin=skins.find(x=>x.id===id);if(!skin||skin.luckyOnly||skin.dropOnly||s.owned.includes(id)||s.bank<skin.cost)return false;s.bank-=skin.cost;s.owned.push(id);s.equipped=id;return true}
@@ -112,5 +119,5 @@
  function award(s,best=0){s.badges=s.badges||[];const added=[];for(const a of achievements)if(!s.badges.includes(a.id)&&a.value(s,best)>=a.goal){s.badges.push(a.id);added.push(a.id)}return added}
  const goatScore=(s,bestCombo=0)=>Math.floor(100*(4*Math.log10(s.lifetime+1)+3*Math.log10(basePerSecond(s)+1)+2*Math.log10(s.clicks+1)+2*(s.owned.length-1)+Math.log10(bestCombo+1)));
  const sortedSkins=()=>[...skins].sort((a,b)=>a.power-b.power||(a.cost??Infinity)-(b.cost??Infinity)||a.name.localeCompare(b.name));
- const api={inputTime,comboLimit,catchupLimit,catchupMultiplier,catchupAmount,sortedSkins,rebirthMultiplier,justinMultiplier,rewardClick,claimCritical,scheduleCritical,skins,backdrops,buyBackdrop,businesses,achievements,award,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore,basePerClick,basePerSecond,multiplier,passiveAmount,offlineRate,offlineCap,offlinePerDay,accrueOffline,rollGolden};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
+ const api={inputTime,comboLimit,catchupLimit,catchupMultiplier,catchupAmount,sortedSkins,rebirthMultiplier,justinMultiplier,rewardClick,claimCritical,criticalGrade,criticalPeriod,scheduleCritical,skins,backdrops,buyBackdrop,businesses,achievements,award,fresh,clean,perClick,perSecond,price,earn,click,buySkin,buyBusiness,comboWindow,comboHit,goatScore,basePerClick,basePerSecond,multiplier,passiveAmount,offlineRate,offlineCap,offlinePerDay,accrueOffline,rollGolden};root.JustinGame=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

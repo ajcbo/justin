@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createAdministration} from './administration.mjs';
 import {planLegacyRecall,recallSummary,applyLegacyRecall} from './legacy-boxes.mjs';
-const G=createRequire(import.meta.url)('../dist/progression-core.js'),filename=process.env.JUSTIN_DB;
+const G=createRequire(import.meta.url)('../dist/cosmetics-core.js'),filename=process.env.JUSTIN_DB;
 if(!filename||!fs.existsSync(filename))throw Error('JUSTIN_DB must point to the existing private game database.');
 const db=new DatabaseSync(filename);db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;');
 const admin=createAdministration(db,G,(status,message)=>Object.assign(Error(message),{status})),actor=admin.ownerId(),command=process.argv[2];

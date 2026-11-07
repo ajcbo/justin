@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import {isIP} from 'node:net';
-const require=createRequire(import.meta.url),G=require('../dist/progression-core.js'),derive=promisify(scrypt);
+const require=createRequire(import.meta.url),G=require('../dist/cosmetics-core.js'),derive=promisify(scrypt);
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const dbPath=process.env.JUSTIN_DB||path.join(path.dirname(fileURLToPath(import.meta.url)),'data/game.sqlite');
 if(process.env.RAILWAY_ENVIRONMENT_ID){
@@ -88,7 +88,13 @@ function play(req,res,data,s){
   else if(action.kind==='challenge'){if(!G.Progression.task(state,action.id,now))rejected++}
   else if(action.kind==='book-reward'){if(!G.Progression.book(state,Number(action.count),now))rejected++}
   else if(action.kind==='community-reward'){if(!G.Progression.community(state,communityBefore,Number(action.goal),now))rejected++}
-  else if(action.kind==='catch-justin'){if(!G.Progression.catchJustin(state,Number(action.slot),now))rejected++}
+  else if(action.kind==='catch-justin'){if(!G.Progression.catchJustin(state,Number(action.slot),now,randomInt(1000000)/1000000))rejected++}
+  else if(action.kind==='invasion-join'){if(!G.Progression.joinInvasion(state,now))rejected++}
+  else if(action.kind==='cosmetic-buy'){if(!G.Cosmetics.buyCosmetic(state,String(action.id)))rejected++}
+  else if(action.kind==='cosmetic-equip'){if(!G.Cosmetics.equipCosmetic(state,action.id==null?null:String(action.id)))rejected++}
+  else if(action.kind==='ability-start'){if(!G.Cosmetics.startAbility(state,String(action.id),now))rejected++}
+  else if(action.kind==='ability-hit'){const at=Math.round(Number(action.at));if(!Number.isFinite(at)||at>now+500||at<now-15000||!G.Cosmetics.hitAbility(state,String(action.id),at))rejected++}
+  else if(action.kind==='ability-finish'){if(!G.Cosmetics.finishAbility(state,String(action.id),now))rejected++}
   else throw fail(400,'Unknown game action.');
  }
  G.Progression.prepare(state,now);G.scheduleCritical(state,now,()=>randomBytes(12).toString('hex'));G.award(state,best);const result={live:admin.live(s.user_id),user:publicUser(s.user_id,s.username),epoch:admin.epoch(),state,bestCombo:best,rejected,notice,offlineEarned:elapsed>=30?offlineEarned:0,serverNow:now};state.savedAt=now;
@@ -101,7 +107,7 @@ const liveStreams=new Set(),streamSession=db.prepare('SELECT 1 FROM sessions WHE
 function pushLive(){const now=Date.now(),cache=new Map();for(const entry of liveStreams){if(entry.sessionHash&&!streamSession.get(entry.sessionHash,now)){entry.res.end();liveStreams.delete(entry);continue}const key=entry.userId||'';if(!cache.has(key))cache.set(key,{...admin.live(entry.userId),...(entry.userId?{chat:social.snapshot()}:{})});const data=cache.get(key),signature=JSON.stringify([data.muteUntil,data.announcements,data.chat?.revision]);if(signature!==entry.last){entry.last=signature;if(!entry.res.write('data: '+JSON.stringify(data)+'\n\n')){entry.res.destroy();liveStreams.delete(entry)}}else if(now-entry.heartbeat>15000){entry.heartbeat=now;entry.res.write(': keep-alive\n\n')}}}
 setInterval(pushLive,500).unref();
 function streamLive(req,res,url){limit('stream:'+clientAddress(req),120,60000);const address=clientAddress(req);if(liveStreams.size>=500||[...liveStreams].filter(e=>e.address===address).length>=30)throw fail(429,'Too many live connections.');let s=session(req);const view=url.searchParams.get('ownerView');if(view){if(!s)throw fail(401,'Please log in as the owner.');const target=admin.viewTarget(s.user_id,view);s={...s,user_id:target.id}}res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();const entry={res,userId:s?.user_id||null,sessionHash:s?.token_hash||null,address,last:null,heartbeat:Date.now()};liveStreams.add(entry);res.on('close',()=>liveStreams.delete(entry));pushLive()}
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.mp3':'audio/mpeg','.wav':'audio/wav','.svg':'image/svg+xml'};
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.mp3':'audio/mpeg','.wav':'audio/wav','.svg':'image/svg+xml','.mp4':'video/mp4'};
 const server=http.createServer(async(req,res)=>{
  req.response=res;res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');
  try{const url=new URL(req.url,publicOrigin);
@@ -137,7 +143,10 @@ const server=http.createServer(async(req,res)=>{
   if(['/api/admin/grant','/api/admin/reset','/api/admin/restore','/api/admin/event','/api/admin/revoke','/api/admin/take','/api/admin/access','/api/admin/rank','/api/admin/mute','/api/admin/announce'].includes(url.pathname)&&req.method==='POST'){originCheck(req);const s=requireSession(req);if(!admin.isAdmin(s.user_id))throw fail(403,'Your account does not have admin panel access.');limit('admin:'+s.user_id,30,60000);const data=await body(req),kind=url.pathname.split('/').pop();json(res,200,admin[kind](s.user_id,data));if(['access','grant','take'].includes(kind))social.invalidate();if(['announce','mute','access','grant','take'].includes(kind))pushLive();return}
   if(url.pathname.startsWith('/api/'))throw fail(404,'Unknown endpoint.');
   if(!['GET','HEAD'].includes(req.method))throw fail(405,'Method not allowed.');
-  const pathname=decodeURIComponent(url.pathname),filename=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!filename.startsWith(root+path.sep)||!fs.existsSync(filename)||!fs.statSync(filename).isFile())throw fail(404,'Not found.');res.writeHead(200,{'Content-Type':mime[path.extname(filename)]||'application/octet-stream','Cache-Control':'no-cache'});if(req.method==='HEAD')res.end();else fs.createReadStream(filename).pipe(res);
+  const pathname=decodeURIComponent(url.pathname),filename=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!filename.startsWith(root+path.sep)||!fs.existsSync(filename)||!fs.statSync(filename).isFile())throw fail(404,'Not found.');// Videos need byte ranges for iPhone Safari; cutscene URLs are versioned, so they can be cached.
+  const size=fs.statSync(filename).size,type=mime[path.extname(filename)]||'application/octet-stream',cache=type.startsWith('video/')?'public, max-age=604800':'no-cache',range=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range||'');
+  if(range&&(range[1]||range[2])){const start=range[1]?Number(range[1]):Math.max(0,size-Number(range[2])),end=range[1]&&range[2]?Math.min(Number(range[2]),size-1):size-1;if(start>end||start>=size){res.writeHead(416,{'Content-Range':'bytes */'+size});res.end();return}res.writeHead(206,{'Content-Type':type,'Cache-Control':cache,'Accept-Ranges':'bytes','Content-Range':'bytes '+start+'-'+end+'/'+size,'Content-Length':end-start+1});if(req.method==='HEAD')res.end();else fs.createReadStream(filename,{start,end}).pipe(res);return}
+  res.writeHead(200,{'Content-Type':type,'Cache-Control':cache,'Accept-Ranges':'bytes','Content-Length':size});if(req.method==='HEAD')res.end();else fs.createReadStream(filename).pipe(res);
  }catch(error){if(!res.headersSent)json(res,error.status||500,{error:error.status?error.message:'The game server had a problem. Try again.'});else res.end()}
 });
 server.listen(port,host,()=>console.log(`Justin accounts + leaderboards: ${publicOrigin}`));

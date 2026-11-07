@@ -1,0 +1,63 @@
+/* Cosmetics shop, ability button and ability activities. White surfaces, ink edges, restrained accents. */
+.reward-dock>.backdrop-feature{grid-column:1/4}
+.reward-dock>.cosmetics-feature{grid-column:4/-1;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;min-height:72px;padding:10px 14px;text-align:left;background:#f1eaff;border-width:2px}
+.cosmetics-feature>span>b{display:block;font-size:19px}.cosmetics-feature>span>small{font-size:10px;color:#555;margin-top:2px}
+.cosmetics-feature:hover{background:#e6dbff}
+@media(max-width:650px){.reward-dock>.backdrop-feature{grid-column:1/4}.reward-dock>.cosmetics-feature{grid-column:4/-1;min-height:52px;padding:7px 10px;gap:6px}.reward-dock>.backdrop-feature .backdrop-samples{display:none}.cosmetics-feature>span>b,.backdrop-feature>span>b{font-size:15px}.cosmetics-feature>span>small{display:none}}
+
+.cosmetics-dialog{width:min(920px,94vw);max-width:920px}
+.cos-wallet{font-size:12px;color:#666;margin:-6px 0 12px}.cos-wallet b{color:var(--ink);font-weight:900}
+.cos-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:16px;align-items:start}
+.cos-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cos-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px 10px;border:1.5px solid #ccc;border-radius:12px;background:#fff;text-align:center;overflow:hidden;cursor:pointer;box-shadow:none}
+.cos-card canvas{width:100%;max-width:150px;aspect-ratio:150/170;height:auto}
+.cos-card b{font-size:13px;line-height:1.15}
+.cos-card em{font-style:normal;font-size:11px;font-weight:900;color:#555}
+.cos-card small{font-size:10px;color:#6a4fb0;font-weight:700}
+.cos-card.can-afford em{color:#2f6b00}
+.cos-card.is-owned{background:#fafff0}
+.cos-card.is-selected{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink)}
+.cos-ribbon{position:absolute;top:14px;right:-30px;padding:3px 34px;background:#ff8a3d;color:#fff;border:2px solid var(--ink);font-size:10px;font-weight:900;letter-spacing:1px;transform:rotate(30deg)}
+.cos-preview{position:sticky;top:0;display:flex;flex-direction:column;gap:6px;padding:12px;border:2px solid var(--ink);border-radius:14px;background:#fffef6;box-shadow:0 4px 0 var(--ink)}
+.cos-preview canvas{width:100%;max-width:300px;aspect-ratio:300/340;height:auto;align-self:center;background:radial-gradient(circle at 50% 45%,#fff,#f2f0e6 70%);border-radius:10px}
+.cos-preview>b{font-size:20px}
+.cos-preview>span{font-size:12px;font-weight:900;color:#6a4fb0}
+.cos-preview>p{margin:0;font-size:12px;line-height:1.45;color:#555}
+.cos-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.cos-actions button{flex:1 1 auto;min-height:40px;padding:8px 10px;border:2px solid var(--ink);border-radius:10px;background:#fff;font-weight:900;font-size:12px;box-shadow:0 2px 0 var(--ink)}
+#cos-main{background:var(--lime)}#cos-main[data-kind=unequip]{background:#fff}#cos-main:disabled{background:#eee;color:#888;box-shadow:none;border-color:#bbb}
+.cos-preview>small{font-size:11px;color:#777}
+@media(max-width:650px){.cos-layout{grid-template-columns:1fr}.cos-preview{position:static;order:-1}.cos-preview canvas{max-width:200px}.cos-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Ability button: beneath Justin, charge ring + clear states */
+#ability-dock{display:flex;justify-content:center;margin:8px 0 2px}
+#ability-button{display:flex;align-items:center;gap:10px;min-height:58px;padding:6px 16px 6px 8px;border:2px solid var(--ink);border-radius:30px;background:#fff;box-shadow:0 3px 0 var(--ink);text-align:left;position:relative}
+#ability-button svg{position:absolute;left:4px;top:50%;width:52px;height:52px;transform:translateY(-50%) rotate(-90deg);pointer-events:none}
+#ability-button .ring-bg{fill:none;stroke:#eee;stroke-width:4}
+#ability-button .ring{fill:none;stroke:#8dff6a;stroke-width:4;stroke-dasharray:100;stroke-dashoffset:0;stroke-linecap:round;transition:stroke-dashoffset .3s}
+#ability-button canvas{width:44px;height:44px;margin-left:4px;position:relative}
+#ability-button span{display:flex;flex-direction:column;gap:1px}
+#ability-button b{font-size:14px}#ability-button small{font-size:11px;color:#666;font-variant-numeric:tabular-nums}
+#ability-button[data-state=ready]{background:#f2ffcf;animation:ability-ready 1.4s ease-in-out infinite}
+#ability-button[data-state=cooldown] .ring{stroke:#b28ef5}
+#ability-button[data-state=running]{background:#fff3c4}
+#ability-button[data-state=blocked]{background:#f4f4f0}
+#ability-button:disabled{cursor:default}
+#ability-button[data-state=ready]:active{transform:translateY(2px);box-shadow:none}
+@keyframes ability-ready{50%{box-shadow:0 3px 0 var(--ink),0 0 0 6px #8dff6a55}}
+
+/* Activity arena inside the stage; decorative distractions go quiet while it runs */
+.ability-arena{position:absolute;inset:0;z-index:14;touch-action:none;-webkit-user-select:none;user-select:none;cursor:crosshair;background:rgba(255,255,255,.55);animation:arena-in .3s ease-out}
+.ability-arena.leaving{opacity:0;transition:opacity .3s}
+.ability-arena canvas{position:absolute;inset:0;width:100%;height:100%}
+.ab-hud{position:absolute;left:8px;right:8px;top:8px;display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:6px 10px;background:#fffef6ee;border:2px solid var(--ink);border-radius:12px;pointer-events:none}
+.ab-hud b{font-size:14px;font-weight:900}.ab-hud span{grid-column:1;font-size:11px;color:#555;line-height:1.3}.ab-hud em{grid-row:1/3;grid-column:2;align-self:center;font-style:normal;font-weight:900;font-size:14px;color:#c4006e;font-variant-numeric:tabular-nums}
+.ab-demo{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);padding:2px 10px;border-radius:10px;background:#202020cc;color:#fff;font-style:normal;font-size:10px;font-weight:900;letter-spacing:1px;pointer-events:none}
+.ab-stop{position:absolute;right:8px;bottom:8px;padding:4px 10px;border:1.5px solid #999;border-radius:12px;background:#fff;font-size:11px}
+.ab-result{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;min-width:min(300px,86%);padding:14px 18px;border:3px solid var(--ink);border-radius:16px;background:#f2ffcf;box-shadow:0 5px 0 var(--ink);text-align:center;animation:result-in .35s cubic-bezier(.2,.9,.3,1.3)}
+.ab-result small{font-size:10px;font-weight:900;letter-spacing:1.5px;color:#6a4fb0}.ab-result b{font-size:24px;font-weight:900}.ab-result span{font-size:11px;color:#555}
+@keyframes arena-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@keyframes result-in{from{opacity:0;transform:translate(-50%,-50%) scale(.85)}to{opacity:1;transform:translate(-50%,-50%)}}
+.cosmetic-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+body.ability-running #toy-screen,body.ability-running .critical-target,body.ability-running .justin-bubble,body.ability-running #invasion-call{visibility:hidden}
+@media(prefers-reduced-motion:reduce){.ability-arena,.ab-result,#ability-button[data-state=ready]{animation:none}}
